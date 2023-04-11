@@ -1,29 +1,53 @@
 //! AST module
 //! High level representation of the constructs used in `.pif` files
+use crate::{Identifier, IdentifierServer};
 
+pub type InnerTerm = Term<Identifier>;
 /// Represents parsed terms
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Term<T> {
-    Application {
-        symbol: String,
-        terms: Vec<Term<T>>,
+    Function {
+        symbol: T,
+        parameters: Vec<Term<T>>,
     },
     Variable {
-        value: T,
+        symbol: T,
+    }
+}
+/// Allows transformation of Atoms to Terms seamlessly
+impl<T> From<Atom<T>> for Term<T> {
+    fn from(value: Atom<T>) -> Term<T> {
+        Term::Function {
+            symbol: value.symbol,
+            parameters: value.parameters
+        }
+    }
+}
+impl From<(&Term<String>, &mut IdentifierServer)> for InnerTerm {
+    fn from((t, id_server): (&Term<String>, &mut IdentifierServer)) -> Self {
+        match t {
+            Term::Variable { .. } => Term::Variable {
+                symbol: id_server.register(t)
+            },
+            Term::Function { parameters, .. } => Term::Function {
+                symbol: id_server.register(t),
+                parameters: parameters.iter().map(|p| Term::from((p, id_server))).collect()
+            }
+        }
     }
 }
 impl<T: std::fmt::Display> std::fmt::Display for Term<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Term::Application {
+            Term::Function {
                 symbol,
-                terms
+                parameters: terms
             } => {
                 let terms_pp = format_vec(terms, ", ");
                 write!(f, "{symbol}({terms_pp})")
             },
             Term::Variable {
-                value
+                symbol: value
             } => {
                 write!(f, "{value}")
             }
@@ -31,30 +55,52 @@ impl<T: std::fmt::Display> std::fmt::Display for Term<T> {
     }
 }
 
+pub type InnerAtom = Atom<Identifier>;
 /// Represents parsed atoms, which are named lists of terms
-#[derive(Debug, Clone)]
+/// Those are equivalent to Term::Function but necessary to avoid having variables
+/// as top level objects
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Atom<T> {
-    pub symbol: String,
-    pub terms: Vec<Term<T>>,
+    pub symbol: T,
+    pub parameters: Vec<Term<T>>,
+}
+impl From<(&Atom<String>, &mut IdentifierServer)> for InnerAtom {
+    fn from((a, id_server): (&Atom<String>, &mut IdentifierServer)) -> Self {
+        let Atom { symbol: _, parameters } = a;
+        Atom {
+            symbol: id_server.register(&Term::from(a.clone())),
+            parameters: parameters.iter().map(|p| Term::from((p, id_server))).collect()
+        }
+    }
 }
 impl<T: std::fmt::Display> std::fmt::Display for Atom<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Atom { symbol, terms } = self;
+        let Atom { symbol, parameters: terms } = self;
         let terms_pp = format_vec(terms, ", ");
         write!(f, "{symbol}({terms_pp})")
     }
 }
 
+pub type InnerRule = Rule<Identifier>;
 /// Represents parsed rules as a list of premisses and the concluded atom
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Rule<T> {
-    pub premisses: Vec<Atom<T>>,
+    pub premises: Vec<Atom<T>>,
     pub conclusion: Atom<T>,
+}
+impl From<(&Rule<String>, &mut IdentifierServer)> for InnerRule {
+    fn from((r, id_server): (&Rule<String>, &mut IdentifierServer)) -> Self {
+        let Rule { premises, conclusion } = r;
+        Rule {
+            premises: premises.into_iter().map(|p| InnerAtom::from((p, id_server))).collect(),
+            conclusion: Atom::from((conclusion, id_server)),
+        }
+    }
 }
 impl<T: std::fmt::Display> std::fmt::Display for Rule<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Rule { premisses, conclusion } = self;
-        let premisses_pp = format_vec(premisses, " /\\");
+        let Rule { premises, conclusion } = self;
+        let premisses_pp = format_vec(premises, " /\\");
         write!(f, "{premisses_pp} => {conclusion}")
     }
 }

@@ -25,7 +25,6 @@ impl Parser {
     pub fn parse_query(input: Input) -> Atom<String> {
         terminated(Self::parse_atom, Lexeme::Stop)(input).unwrap().1
     }
-
     pub fn parse_rules(input: Input) -> Vec<Rule<String>> {
         many0(Self::parse_rule)(input).unwrap().1
     }
@@ -33,13 +32,13 @@ impl Parser {
         if let Ok((rest, premisses)) = terminated(Self::parse_atoms, Lexeme::Implies)(input.clone()) {
             let (rest, conclusion) = terminated(Self::parse_atom, Lexeme::Stop)(rest)?;
             Ok((rest, Rule {
-                premisses,
+                premises: premisses,
                 conclusion
             }))
         } else {
             let (rest, conclusion) = terminated(Self::parse_atom, Lexeme::Stop)(input)?;
             Ok((rest, Rule {
-                premisses: vec![],
+                premises: vec![],
                 conclusion
             }))
         }
@@ -52,7 +51,7 @@ impl Parser {
         let (rest, (symbol, terms)) = pair(Self::parse_constant, delimited(Lexeme::OpeningParentheses, Self::parse_terms, Lexeme::ClosingParentheses))(input)?;
         Ok((rest, Atom {
             symbol,
-            terms
+            parameters: terms
         }))
     }
 
@@ -66,25 +65,25 @@ impl Parser {
     fn parse_application(input: Input) -> nom::IResult<Input, Term<String>> {
         let (rest, symbol) = Self::parse_constant(input)?;
         if let Ok((rest, terms)) = delimited(Lexeme::OpeningParentheses, Self::parse_terms, Lexeme::ClosingParentheses)(rest.clone()) {
-            Ok((rest, Term::Application {
+            Ok((rest, Term::Function {
                 symbol,
-                terms,
+                parameters: terms,
             }))
         } else {
-            Ok((rest, Term::Application {
+            Ok((rest, Term::Function {
                 symbol,
-                terms: vec![],
+                parameters: vec![],
             }))
         }
     }
 
     logos_nom_bridge::data_variant_parser! {
         fn parse_variable(input) -> Result<Term<String>>;
-        pattern = Lexeme::Variable(value) => Term::Variable { value };
+        pattern = Lexeme::Variable(symbol) => Term::Variable { symbol };
     }
     logos_nom_bridge::data_variant_parser! {
         fn parse_integer(input) -> Result<Term<String>>;
-        pattern = Lexeme::Integer(_i) => Term::Variable { value: String::from("todo") };
+        pattern = Lexeme::Integer(_i) => Term::Variable { symbol: String::from("todo") };
     }
     logos_nom_bridge::data_variant_parser! {
         fn parse_constant(input) -> Result<String>;

@@ -43,6 +43,7 @@ impl Sniffer {
 
     /// Returns a derivation that results in a given rule if one exists
     pub fn find(&mut self, rule: &Rule<String>) -> Result<(), SaturationFailure> {
+        /*
         let found = loop {
             if let Some(r) = self.rules.iter().find(|r| *r == rule) {
                 break r;
@@ -50,6 +51,8 @@ impl Sniffer {
             self.saturate()?
         };
         Ok(())
+         */
+        todo!()
     }
 
     fn saturate(&mut self) -> Result<(), SaturationFailure> {

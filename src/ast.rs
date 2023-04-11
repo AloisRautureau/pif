@@ -29,9 +29,16 @@ impl From<(&Term<String>, &mut IdentifierServer)> for InnerTerm {
             Term::Variable { .. } => Term::Variable {
                 symbol: id_server.register(t)
             },
-            Term::Function { parameters, .. } => Term::Function {
-                symbol: id_server.register(t),
-                parameters: parameters.iter().map(|p| Term::from((p, id_server))).collect()
+            Term::Function { parameters, .. } => {
+                let symbol = id_server.register(t);
+                let mut new_parameters = vec![];
+                for parameter in parameters {
+                    new_parameters.push(Term::from((parameter, &mut *id_server)))
+                }
+                Term::Function {
+                    symbol,
+                    parameters: new_parameters
+                }
             }
         }
     }
@@ -64,12 +71,33 @@ pub struct Atom<T> {
     pub symbol: T,
     pub parameters: Vec<Term<T>>,
 }
+impl<T> TryFrom<Term<T>> for Atom<T> {
+    type Error = ();
+
+    fn try_from(value: Term<T>) -> Result<Self, Self::Error> {
+        match value {
+            Term::Function {
+                symbol,
+                parameters
+            } => Ok(Atom {
+                symbol,
+                parameters
+            }),
+            _ => Err(())
+        }
+    }
+}
 impl From<(&Atom<String>, &mut IdentifierServer)> for InnerAtom {
     fn from((a, id_server): (&Atom<String>, &mut IdentifierServer)) -> Self {
         let Atom { symbol: _, parameters } = a;
+        let symbol = id_server.register(&Term::from(a.clone()));
+        let mut new_parameters = vec![];
+        for parameter in parameters {
+            new_parameters.push(Term::from((parameter, &mut *id_server)))
+        }
         Atom {
-            symbol: id_server.register(&Term::from(a.clone())),
-            parameters: parameters.iter().map(|p| Term::from((p, id_server))).collect()
+            symbol,
+            parameters: new_parameters
         }
     }
 }
@@ -91,9 +119,14 @@ pub struct Rule<T> {
 impl From<(&Rule<String>, &mut IdentifierServer)> for InnerRule {
     fn from((r, id_server): (&Rule<String>, &mut IdentifierServer)) -> Self {
         let Rule { premises, conclusion } = r;
+        let conclusion = Atom::from((conclusion, &mut *id_server));
+        let mut new_premises = vec![];
+        for pre in premises {
+            new_premises.push(Atom::from((pre, &mut *id_server)))
+        }
         Rule {
-            premises: premises.into_iter().map(|p| InnerAtom::from((p, id_server))).collect(),
-            conclusion: Atom::from((conclusion, id_server)),
+            conclusion,
+            premises: new_premises,
         }
     }
 }

@@ -1,0 +1,10 @@
+[package]
+name = "pif"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+logos = "0.12.0"
+nom = "7.1.3"
+logos-nom-bridge = "0.1.0"

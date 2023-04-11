@@ -1,0 +1,36 @@
+# Calculs de l'attaquant.
+
+att(X) /\ att(Y) => att(pair(X,Y)).
+att(pair(X,Y)) => att(X).
+att(pair(X,Y)) => att(Y).
+
+att(X) /\ att(Y) => att(aenc(X,Y)).
+att(aenc(X,pub(Y))) /\ att(Y) => att(X).
+
+att(X) => att(pub(X)).
+
+# On écrira {m}_pk pour le chiffrement asymétrique du message
+# m avec la clé publique pk.
+
+# Protocole Needham-Schroeder à clé publique
+#
+# a -> b : {pub(ska),na}_pub(skb)
+# a <- b : {na,nb}_pub(ska)
+# a -> b : {nb}_pub(skb)
+#
+# Propriété à vérifier:
+# - Si a et b ne se parlent qu'entre eux,
+#   alors na et nb ne sont connus que d'eux.
+# - On peut aussi vérifier que ska et skb restent secrètes.
+
+att(pub(ska)).
+att(pub(skb)).
+
+# Agent a, s'adressant à b.
+
+att(aenc(pair(pub(ska),na),pub(skb))).
+att(aenc(pair(na,Y),pub(ska))) => att(aenc(Y,pub(skb))).
+
+# Agent b, échangeant avec a seulement.
+
+att(aenc(pair(pub(ska),X),pub(skb))) => att(aenc(pair(X,nb),pub(ska))).

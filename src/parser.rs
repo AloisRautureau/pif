@@ -22,12 +22,12 @@ type Input<'source> = Tokens<'source, Lexeme>;
 
 pub struct Parser;
 impl Parser {
-    pub fn parse(source: &str) -> Vec<Rule<String>> {
-        Parser::parse_rules(Tokens::new(source)).unwrap().1
+    pub fn parse_query(input: Input) -> Atom<String> {
+        terminated(Self::parse_atom, Lexeme::Stop)(input).unwrap().1
     }
 
-    fn parse_rules(input: Input) -> nom::IResult<Input, Vec<Rule<String>>> {
-        many0(Self::parse_rule)(input)
+    pub fn parse_rules(input: Input) -> Vec<Rule<String>> {
+        many0(Self::parse_rule)(input).unwrap().1
     }
     fn parse_rule(input: Input) -> nom::IResult<Input, Rule<String>> {
         if let Ok((rest, premisses)) = terminated(Self::parse_atoms, Lexeme::Implies)(input.clone()) {

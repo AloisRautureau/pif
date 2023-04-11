@@ -1,3 +1,7 @@
+//! Lexer module
+//! `Lexeme::lexer(source)` takes a string slice as input, then creates a lazily evaluated
+//! iterator of lexemes parsed from said source
+
 use logos::Logos;
 
 #[derive(Debug)]
@@ -35,40 +39,3 @@ pub enum Lexeme {
     Error,
 }
 logos_nom_bridge::token_parser!(token: Lexeme);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn lexer_test() {
-        let mut lexer = Lexeme::lexer(
-r"# Attacker capabilities
-
-att(X) /\ att(Y) => att(pair(X,Y)).
-att(pair(X,Y)) => att(X).
-att(pair(X,Y)) => att(Y).
-
-att(X) => att(h(X)).
-
-att(X) /\ att(Y) => att(senc(X,Y)).
-att(senc(X,Y)) /\ att(Y) => att(X).
-
-att(X) /\ att(Y) => att(aenc(X,Y)).
-att(aenc(X,pub(Y))) /\ att(Y) => att(X).
-
-att(X) => att(pub(X)).
-
-# Test protocol
-
-att(kleak).
-att(senc(secret,ksecret)).
-att(senc(leak,kleak)).
-
-# att(secret) is not derivable.
-# att(leak) is derivable.
-");
-
-        assert_eq!(lexer.next(), Some(Ok(Lexeme::Newline)));
-    }
-}

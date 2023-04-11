@@ -1,3 +1,6 @@
+//! AST module
+//! High level representation of the constructs used in `.pif` files
+
 /// Represents parsed terms
 #[derive(Debug, Clone)]
 pub enum Term<T> {

@@ -1,5 +1,3 @@
-use pif::run;
-
 fn main() {
-    run()
+    println!("Hello logic!")
 }

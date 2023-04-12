@@ -15,8 +15,11 @@ mod identifiers;
 
 /// Sniffer's job is to saturate a set of rules, by deriving the current set until no
 /// new rule can be added
+#[derive(Default)]
 pub struct Sniffer {
-    rules: HashSet<InnerRule>,
+    generative_rules: HashSet<InnerRule>,
+    axioms: HashSet<InnerAtom>,
+
     id_server: IdentifierServer,
 }
 impl Sniffer {
@@ -28,17 +31,16 @@ impl Sniffer {
         let parsed_rules = Parser::parse_rules(Tokens::new(&file_contents));
 
         // Then maps every string id to an inner identifier
-        let mut rules = HashSet::with_capacity(parsed_rules.len());
-        let mut id_server = IdentifierServer::default();
-
+        let mut sniffer = Sniffer::default();
         for rule in parsed_rules {
-            rules.insert(Rule::from((&rule, &mut id_server)));
+            if rule.premises.is_empty() {
+                sniffer.axioms.insert(Atom::from((&rule.conclusion, &mut sniffer.id_server)));
+            } else {
+                sniffer.generative_rules.insert(Rule::from((&rule, &mut sniffer.id_server)));
+            }
         }
 
-        Sniffer {
-            rules,
-            id_server,
-        }
+        sniffer
     }
 
     /// Returns a derivation that results in a given rule if one exists
@@ -62,15 +64,15 @@ impl Sniffer {
         // one matches. When this happens, the conclusion can be added to the set of axioms
         // TODO: use a more clever selection function in order to avoid exponential growth
 
-        let new_rules = HashSet::new();
+        let new_axioms = HashSet::new();
 
-        for rule in &self.rules {
+        for rule in &self.generative_rules {
             for premise in &rule.premises {
                 // Try to unify the premise with any of the currently derived axioms
                 // TODO: That's the entirety of the project tbh
             }
         }
-        self.rules = new_rules;
+        self.axioms = self.axioms.union(&new_axioms).cloned().collect();
         Ok(())
     }
 }

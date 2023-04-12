@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::ast::{Atom, InnerAtom, InnerRule, InnerTerm, Term};
+use crate::ast::{Atom, InnerAtom, InnerRule, InnerTerm, Rule, Term};
 use crate::identifiers::Identifier;
 
 #[derive(Default)]
@@ -15,7 +15,7 @@ impl UnificationContext {
     pub fn deref<'a>(&'a self, mut symbol: &'a Identifier) -> Option<&InnerTerm> {
         loop {
             match self.references.get(symbol) {
-                Some(Term::Variable { symbol: s }) => symbol = s,
+                Some(Term::Variable { symbol: s }) if s != symbol => symbol = s,
                 x => break x
             }
         }
@@ -23,12 +23,22 @@ impl UnificationContext {
 }
 
 impl InnerRule {
-    pub fn assign(&self, values: &Vec<&InnerTerm>) -> Result<InnerAtom, ()> {
+    pub fn assign(&self, values: &[InnerAtom]) -> Result<InnerRule, ()> {
+        if self.premises.len() != values.len() {
+            return Err(())
+        }
+
         let mut unification_context = UnificationContext::default();
         for (pre, val) in self.premises.iter().zip(values) {
-            Term::from(pre.clone()).unify(val, &mut unification_context)?
+            let pre = Term::from(pre.clone());
+            let val = Term::from(val.clone());
+            Term::from(pre.clone()).unify(&Term::from(val), &mut unification_context)?
         }
-        Ok(Atom::try_from(Term::from(self.conclusion.clone()).apply(&unification_context)).unwrap())
+
+        Ok(Rule {
+            premises: Vec::from(values),
+            conclusion: Atom::try_from(Term::from(self.conclusion.clone()).apply(&unification_context)).unwrap(),
+        })
     }
 }
 

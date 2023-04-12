@@ -14,6 +14,14 @@ pub enum Term<T> {
         symbol: T,
     }
 }
+impl<T> Term<T> {
+    pub fn symbol(&self) -> &T {
+        match self {
+            Term::Variable { symbol } => symbol,
+            Term::Function { symbol, .. } => symbol
+        }
+    }
+}
 /// Allows transformation of Atoms to Terms seamlessly
 impl<T> From<Atom<T>> for Term<T> {
     fn from(value: Atom<T>) -> Term<T> {
@@ -43,16 +51,66 @@ impl From<(&Term<String>, &mut IdentifierServer)> for InnerTerm {
         }
     }
 }
+impl TryFrom<(&Term<String>, &IdentifierServer)> for InnerTerm {
+    type Error = ();
+
+    fn try_from((t, id_server): (&Term<String>, &IdentifierServer)) -> Result<Self, Self::Error> {
+        Ok(match t {
+            Term::Variable { symbol } => Term::Variable {
+                symbol: id_server.id_of(symbol).ok_or(())?.clone()
+            },
+            Term::Function { symbol, parameters } => {
+                let symbol = id_server.id_of(symbol).ok_or(())?.clone();
+                let mut new_parameters = vec![];
+                for parameter in parameters {
+                    new_parameters.push(Term::try_from((parameter, id_server))?)
+                }
+                Term::Function {
+                    symbol,
+                    parameters: new_parameters
+                }
+            }
+        })
+    }
+}
+impl TryFrom<(&InnerTerm, &IdentifierServer)> for Term<String> {
+    type Error = ();
+
+    fn try_from((t, id_server): (&InnerTerm, &IdentifierServer)) -> Result<Self, Self::Error> {
+        Ok(match t {
+            Term::Variable { symbol } => Term::Variable {
+                symbol: id_server.name_of(symbol).ok_or(())?.clone()
+            },
+            Term::Function { symbol, parameters } => {
+                let symbol = id_server.name_of(symbol).ok_or(())?.clone();
+                let mut new_parameters = vec![];
+                for parameter in parameters {
+                    new_parameters.push(Term::try_from((parameter, id_server))?)
+                }
+                Term::Function {
+                    symbol,
+                    parameters: new_parameters
+                }
+            }
+        })
+    }
+}
 impl<T: std::fmt::Display> std::fmt::Display for Term<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Term::Function {
                 symbol,
-                parameters: terms
-            } => {
-                let terms_pp = format_vec(terms, ", ");
-                write!(f, "{symbol}({terms_pp})")
+                parameters
+            } if parameters.is_empty() => {
+                write!(f, "{symbol}")
             },
+            Term::Function {
+                symbol,
+                parameters
+            } => {
+                let parameters_pp = format_vec(parameters, ", ");
+                write!(f, "{symbol}({parameters_pp})")
+            }
             Term::Variable {
                 symbol: value
             } => {
@@ -101,11 +159,47 @@ impl From<(&Atom<String>, &mut IdentifierServer)> for InnerAtom {
         }
     }
 }
+impl TryFrom<(&Atom<String>, &IdentifierServer)> for InnerAtom {
+    type Error = ();
+
+    fn try_from((a, id_server): (&Atom<String>, &IdentifierServer)) -> Result<Self, Self::Error>  {
+        let Atom { symbol, parameters } = a;
+        let symbol = id_server.id_of(symbol).ok_or(())?.clone();
+        let mut new_parameters = vec![];
+        for parameter in parameters {
+            new_parameters.push(Term::try_from((parameter, id_server))?)
+        }
+        Ok(Atom {
+            symbol,
+            parameters: new_parameters
+        })
+    }
+}
+impl TryFrom<(&InnerAtom, &IdentifierServer)> for Atom<String> {
+    type Error = ();
+
+    fn try_from((a, id_server): (&InnerAtom, &IdentifierServer)) -> Result<Self, Self::Error> {
+        let Atom { symbol, parameters } = a;
+        let symbol = id_server.name_of(symbol).ok_or(())?.clone();
+        let mut new_parameters = vec![];
+        for parameter in parameters {
+            new_parameters.push(Term::try_from((parameter, id_server))?)
+        }
+        Ok(Atom {
+            symbol,
+            parameters: new_parameters
+        })
+    }
+}
 impl<T: std::fmt::Display> std::fmt::Display for Atom<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Atom { symbol, parameters: terms } = self;
-        let terms_pp = format_vec(terms, ", ");
-        write!(f, "{symbol}({terms_pp})")
+        let Atom { symbol, parameters } = self;
+        if parameters.is_empty() {
+            write!(f, "{symbol}")
+        } else {
+            let parameters_pp = format_vec(parameters, ", ");
+            write!(f, "{symbol}({parameters_pp})")
+        }
     }
 }
 
@@ -128,6 +222,38 @@ impl From<(&Rule<String>, &mut IdentifierServer)> for InnerRule {
             conclusion,
             premises: new_premises,
         }
+    }
+}
+impl TryFrom<(&Rule<String>, &IdentifierServer)> for InnerRule {
+    type Error = ();
+
+    fn try_from((r, id_server): (&Rule<String>, &IdentifierServer)) -> Result<Self, Self::Error> {
+        let Rule { premises, conclusion } = r;
+        let conclusion = Atom::try_from((conclusion, id_server))?;
+        let mut new_premises = vec![];
+        for pre in premises {
+            new_premises.push(Atom::try_from((pre, id_server))?)
+        }
+        Ok(Rule {
+            conclusion,
+            premises: new_premises,
+        })
+    }
+}
+impl TryFrom<(&InnerRule, &IdentifierServer)> for Rule<String> {
+    type Error = ();
+
+    fn try_from((r, id_server): (&InnerRule, &IdentifierServer)) -> Result<Self, Self::Error> {
+        let Rule { premises, conclusion } = r;
+        let conclusion = Atom::try_from((conclusion, id_server))?;
+        let mut new_premises = vec![];
+        for pre in premises {
+            new_premises.push(Atom::try_from((pre, id_server))?)
+        }
+        Ok(Rule {
+            conclusion,
+            premises: new_premises
+        })
     }
 }
 impl<T: std::fmt::Display> std::fmt::Display for Rule<T> {

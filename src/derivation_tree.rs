@@ -1,18 +1,18 @@
+use crate::ast::Atom;
+use ptree::{Style, TreeItem};
 use std::borrow::Cow;
 use std::io::Write;
-use ptree::{Style, TreeItem};
-use crate::ast::Atom;
 
 #[derive(Clone)]
 pub struct DerivationTree {
     root: Atom<String>,
-    premises: Vec<DerivationTree>
+    premises: Vec<DerivationTree>,
 }
 impl DerivationTree {
     pub fn new(root: Atom<String>) -> DerivationTree {
         DerivationTree {
             root,
-            premises: vec![]
+            premises: vec![],
         }
     }
     pub fn insert(&mut self, subtree: DerivationTree) {

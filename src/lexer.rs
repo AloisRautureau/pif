@@ -4,12 +4,6 @@
 
 use logos::Logos;
 
-#[derive(Debug)]
-pub enum LexerError {
-    UnrecognizedLexeme,
-    UnexpectedEof,
-}
-
 /// Valid lexemes for Pif
 #[derive(Logos, Eq, PartialEq, Clone, Debug)]
 pub enum Lexeme {
@@ -36,6 +30,6 @@ pub enum Lexeme {
     #[error]
     #[regex(r"[ \t\n\f]+", logos::skip)]
     #[regex(r"#[^\n]*\n", logos::skip)]
-    Error,
+    UnrecognizedLexeme,
 }
 logos_nom_bridge::token_parser!(token: Lexeme);

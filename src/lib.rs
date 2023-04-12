@@ -1,22 +1,22 @@
 extern crate core;
 
-use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
-use itertools::Itertools;
-use logos_nom_bridge::Tokens;
 use crate::ast::*;
 use crate::derivation_tree::DerivationTree;
 use crate::identifiers::{Identifier, IdentifierServer};
 pub use crate::parser::Parser;
+use itertools::Itertools;
+use logos_nom_bridge::Tokens;
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
 mod ast;
+mod derivation_tree;
+mod identifiers;
 mod lexer;
 mod parser;
 mod unify;
-mod identifiers;
-mod derivation_tree;
 
 /// Sniffer's job is to saturate a set of rules, by deriving the current set until no
 /// new rule can be added
@@ -33,8 +33,12 @@ impl Sniffer {
     pub fn new<P: AsRef<Path>>(file: P) -> Sniffer {
         // Parses the `.pif` file
         let mut file_contents = String::new();
-        File::open(file).unwrap().read_to_string(&mut file_contents).unwrap();
-        let parsed_rules = Parser::parse_rules(Tokens::new(&file_contents));
+        File::open(file)
+            .unwrap()
+            .read_to_string(&mut file_contents)
+            .unwrap();
+        let parsed_rules =
+            Parser::parse_rules(Tokens::new(&file_contents)).expect("failed to parse file");
 
         // Then maps every string id to an inner identifier
         let mut sniffer = Sniffer::default();
@@ -43,7 +47,9 @@ impl Sniffer {
                 let inner_axiom = Atom::from((&rule.conclusion, &mut sniffer.id_server));
                 sniffer.add_axiom(inner_axiom);
             } else {
-                sniffer.generative_rules.insert(Rule::from((&rule, &mut sniffer.id_server)));
+                sniffer
+                    .generative_rules
+                    .insert(Rule::from((&rule, &mut sniffer.id_server)));
             }
         }
         sniffer
@@ -52,6 +58,8 @@ impl Sniffer {
     /// Returns a derivation that results in a given rule if one exists
     pub fn find(&mut self, atom: &Atom<String>) -> Result<DerivationTree, SaturationFailure> {
         let inner_atom = Atom::from((atom, &mut self.id_server));
+
+        // We keep saturating our rule set until we either find our atom or the set is fully saturated
         while !self.axioms.contains(&inner_atom) {
             self.saturate()?
         }
@@ -64,22 +72,28 @@ impl Sniffer {
         // `p`, `p => q` |= `q`
         // In order to do so, we try to unify each and every axiom to every rule's premisses, until
         // one matches. When this happens, the conclusion can be added to the set of axioms
-        // TODO: use a more clever selection function in order to avoid exponential growth
+        // TODO: use a more clever selection function in order to avoid exponential/infinite growth
         let mut derived = vec![];
         for rule in &self.generative_rules {
-            for input in self.axioms.iter().cloned().combinations(rule.premises.len()) {
+            for input in self
+                .axioms
+                .iter()
+                .cloned()
+                .combinations(rule.premises.len())
+            {
                 if let Ok(resulting_rule) = rule.assign(input.as_slice()) {
                     derived.push(resulting_rule);
                 }
             }
         }
 
+        let mut modified = false;
+        for r in derived {
+            modified |= self.add_derived_axiom(r.conclusion, r.premises);
+        }
+
         // Check if there are any new axioms that aren't already registered
-        if derived
-            .into_iter()
-            .fold(true, |acc, r| {
-                acc && self.add_derived_axiom(r.conclusion, r.premises)
-            }) {
+        if modified {
             Ok(())
         } else {
             Err(SaturationFailure::Saturated)
@@ -88,7 +102,9 @@ impl Sniffer {
 
     /// Adds a new derived axiom, return `false` if it was already present
     pub fn add_derived_axiom(&mut self, axiom: InnerAtom, derived_from: Vec<InnerAtom>) -> bool {
-        self.derived_from.entry(axiom.clone()).or_insert_with(|| derived_from);
+        self.derived_from
+            .entry(axiom.clone())
+            .or_insert_with(|| derived_from);
         self.axioms.insert(axiom)
     }
 
@@ -98,9 +114,11 @@ impl Sniffer {
         self.axioms.insert(axiom)
     }
 
+    /// Returns the derivation tree for a given axiom
     pub fn derivation_tree(&self, root: &Atom<String>) -> Option<DerivationTree> {
         fn inner(root: &InnerAtom, sniffer: &Sniffer) -> Option<DerivationTree> {
-            let mut decision_tree = DerivationTree::new(Atom::try_from((root, &sniffer.id_server)).ok()?);
+            let mut decision_tree =
+                DerivationTree::new(Atom::try_from((root, &sniffer.id_server)).ok()?);
             let premises = sniffer.derived_from.get(root)?;
             for pre in premises {
                 decision_tree.insert(inner(pre, sniffer)?)
@@ -121,6 +139,6 @@ impl Sniffer {
 
 /// Represents the result of a saturation attempt
 pub enum SaturationFailure {
-    Saturated,      // The saturation attempt did not create any new rule
-    DerivedBottom,  // The saturation derived a contradiction
+    Saturated,     // The saturation attempt did not create any new rule
+    DerivedBottom, // The saturation derived a contradiction
 }

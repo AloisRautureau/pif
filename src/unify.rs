@@ -24,52 +24,53 @@ impl UnificationContext {
 
 impl InnerRule {
     pub fn assign(&self, values: &Vec<&InnerTerm>) -> Result<InnerAtom, ()> {
-        fn unify(t1: &InnerTerm, t2: &InnerTerm, context: &mut UnificationContext) -> Result<(), ()> {
-            // Finds leaves of terms `self` and `other`
-            let (leaf1, leaf2) = (t1.leaf(context), t2.leaf(context));
-
-            // If the leaves are equal, we can simply return
-            if leaf1 == leaf2 {
-                return Ok(())
-            }
-
-            // Otherwise, our actions depend on the types of `leaf1` and `leaf2`
-            match (&leaf1, &leaf2) {
-                (Term::Variable { symbol: x }, Term::Variable { .. }) => {
-                    context.bind(*x, leaf2.clone());
-                    Ok(())
-                },
-                (x @ Term::Variable { symbol: x_id}, f @ Term::Function { .. })
-                | (f @ Term::Function { .. }, x @ Term::Variable { symbol: x_id}) => {
-                    if f.contains(&x) {
-                        Err(())
-                    } else {
-                        context.bind(*x_id, f.clone());
-                        Ok(())
-                    }
-                },
-                (Term::Function { symbol: f, parameters: u}, Term::Function { symbol: g, parameters: v }) => {
-                    if f == g && u.len() == v.len() {
-                        let _ = u.iter().zip(v.iter())
-                            .map(|(x, y)| unify(x, y, &mut *context))
-                            .collect::<Result<Vec<_>, _>>()?;
-                        Ok(())
-                    } else {
-                        Err(())
-                    }
-                }
-            }
-        }
-
         let mut unification_context = UnificationContext::default();
         for (pre, val) in self.premises.iter().zip(values) {
-            unify(&Term::from(pre.clone()), val, &mut unification_context)?
+            Term::from(pre.clone()).unify(val, &mut unification_context)?
         }
         Ok(Atom::try_from(Term::from(self.conclusion.clone()).apply(&unification_context)).unwrap())
     }
 }
 
 impl InnerTerm {
+    /// Tries to unify this term with another
+    fn unify(&self, other: &InnerTerm, context: &mut UnificationContext) -> Result<(), ()> {
+        // Finds leaves of terms `self` and `other`
+        let (leaf1, leaf2) = (self.leaf(context), other.leaf(context));
+
+        // If the leaves are equal, we can simply return
+        if leaf1 == leaf2 {
+            return Ok(())
+        }
+
+        // Otherwise, our actions depend on the types of `leaf1` and `leaf2`
+        match (&leaf1, &leaf2) {
+            (Term::Variable { symbol: x }, Term::Variable { .. }) => {
+                context.bind(*x, leaf2.clone());
+                Ok(())
+            },
+            (x @ Term::Variable { symbol: x_id}, f @ Term::Function { .. })
+            | (f @ Term::Function { .. }, x @ Term::Variable { symbol: x_id}) => {
+                if f.contains(&x) {
+                    Err(())
+                } else {
+                    context.bind(*x_id, f.clone());
+                    Ok(())
+                }
+            },
+            (Term::Function { symbol: f, parameters: u}, Term::Function { symbol: g, parameters: v }) => {
+                if f == g && u.len() == v.len() {
+                    let _ = u.iter().zip(v.iter())
+                        .map(|(x, y)| x.unify(y, &mut *context))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            }
+        }
+    }
+
     /// Returns the leaf term of `self`
     pub fn leaf(&self, context: &UnificationContext) -> InnerTerm {
         match self {
@@ -185,5 +186,66 @@ mod tests {
                 Term::Function { symbol: Identifier::Function(5), parameters: vec![] },
             ]
         })
+    }
+
+    // The following tests on unification are issued from [wikipedia](https://en.wikipedia.org/wiki/Unification_(computer_science))
+    #[test]
+    fn unify_tautology_const_test() {
+        let var = Term::Function { symbol: Identifier::Function(0), parameters: vec![] };
+        let var_copy = var.clone();
+
+        let mut context = UnificationContext::default();
+        assert!(var.unify(&var_copy, &mut context).is_ok());
+        assert!(context.references.is_empty());
+    }
+
+    #[test]
+    fn unify_tautology_var_test() {
+        let var = Term::Variable { symbol: Identifier::Variable(0) };
+        let var_copy = var.clone();
+
+        let mut context = UnificationContext::default();
+        assert!(var.unify(&var_copy, &mut context).is_ok());
+        assert!(context.references.is_empty());
+    }
+
+    #[test]
+    fn unify_diff_const_test() {
+        let x = Term::Function { symbol: Identifier::Function(0), parameters: vec![] };
+        let y = Term::Function { symbol: Identifier::Function(1), parameters: vec![] };
+        assert!(x.unify(&y, &mut UnificationContext::default()).is_err())
+    }
+
+    #[test]
+    fn unify_const_assign_test() {
+        let var = Term::Variable { symbol: Identifier::Variable(0) };
+        let cst = Term::Function { symbol: Identifier::Function(0), parameters: vec![] };
+
+        let mut context = UnificationContext::default();
+        assert!(var.unify(&cst, &mut context).is_ok());
+        assert_eq!(
+            context.references.get(&Identifier::Variable(0)),
+            Some(&Term::Function { symbol: Identifier::Function(0), parameters: vec![] })
+        );
+    }
+
+    #[test]
+    fn unify_aliasing_test() {
+        let x = Term::Variable { symbol: Identifier::Variable(0) };
+        let y = Term::Variable { symbol: Identifier::Variable(1) };
+
+        let mut context = UnificationContext::default();
+        assert!(x.unify(&y, &mut context).is_ok());
+        assert_eq!(
+            context.references.get(&Identifier::Variable(0)),
+            Some(&Term::Variable { symbol: Identifier::Variable(1) })
+        );
+    }
+
+    // Hardcore optimization test, could burn your machine, handle with care
+    #[ignore]
+    #[test]
+    fn the_revenge_of_bin_tree() {
+        todo!()
     }
 }

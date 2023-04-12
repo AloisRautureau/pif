@@ -1,7 +1,12 @@
 [package]
-name = "pif"
+name = "sniffer"
 version = "0.1.0"
 edition = "2021"
+authors = [
+    "Aloïs Rautureau <alois.rautureau@ens-rennes.fr",
+    "Paul Adam <paul.adam@ens-rennes.fr",
+    "Romain De Beaucorps <romain.de-beaucorps@ens-rennes.fr"
+]
 
 
 [dependencies]

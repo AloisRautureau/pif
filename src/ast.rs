@@ -87,8 +87,12 @@ impl<T: std::fmt::Display> std::fmt::Display for Rule<T> {
             premises,
             conclusion,
         } = self;
-        let premisses_pp = format_vec(premises, " /\\ ");
-        write!(f, "{premisses_pp} => {conclusion}")
+        if premises.is_empty() {
+            write!(f, "{conclusion}")
+        } else {
+            let premises_pp = format_vec(premises, " /\\ ");
+            write!(f, "{premises_pp} => {conclusion}")
+        }
     }
 }
 

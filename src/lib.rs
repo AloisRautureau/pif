@@ -68,7 +68,7 @@ impl Sniffer {
                     conclusion: atom.clone(),
                     premises: vec![],
                 })
-                .unwrap()) // WTF ça crash
+                .unwrap())
         } else {
             Err(SaturationFailure::Saturated)
         }
@@ -98,21 +98,19 @@ impl Sniffer {
     /// return Some(DerivationTree ??) if it is finished because we have find our solution
     fn saturate(&mut self) -> Option<DerivationTree> {
         let mut rules_set: Vec<_> = self.rules.clone().into_iter().collect();
-        let mut new_rules: HashSet<Rule<Identifier>> = HashSet::with_capacity(self.rules.len());
 
         while let Some(rule) = rules_set.pop() {
-            for other in new_rules.iter() {
+            for other in &self.rules {
                 if let Some(r) = rule.resolve(other) {
-                    //  TEST r est notre solution
-                    if !new_rules.contains(&r) {
-                        println!("added: {r:?}");
+                    if !self.rules.contains(&r) {
+                        self.derived_from.insert(r.clone(), (rule.clone(), other.clone()));
                         rules_set.push(r)
                     }
                 }
             }
-            new_rules.insert(rule);
+            self.rules.insert(rule);
         }
-        self.rules = new_rules;
+
         None
     }
 
@@ -138,8 +136,12 @@ impl Sniffer {
             let mut decision_tree =
                 DerivationTree::new(Rule::try_from((root, &sniffer.id_server)).ok()?);
             let premises = sniffer.derived_from.get(root)?;
-            decision_tree.add_subtree(inner(&premises.0, sniffer)?);
-            decision_tree.add_subtree(inner(&premises.1, sniffer)?);
+            if let Some(tree) = inner(&premises.0, sniffer) {
+                decision_tree.add_subtree(tree)
+            }
+            if let Some(tree) = inner(&premises.1, sniffer) {
+                decision_tree.add_subtree(tree)
+            }
             Some(decision_tree)
         }
 
@@ -147,8 +149,12 @@ impl Sniffer {
 
         let mut decision_tree = DerivationTree::new(root.clone());
         let premises = self.derived_from.get(&inner_atom)?;
-        decision_tree.add_subtree(inner(&premises.0, self)?);
-        decision_tree.add_subtree(inner(&premises.1, self)?);
+        if let Some(tree) = inner(&premises.0, self) {
+            decision_tree.add_subtree(tree)
+        }
+        if let Some(tree) = inner(&premises.1, self) {
+            decision_tree.add_subtree(tree)
+        }
         Some(decision_tree)
     }
 

@@ -93,6 +93,9 @@ impl Sniffer {
     ///         - every element of E_2
     ///     add C to E_2
     /// return E_2
+    /// 
+    /// return None if it is finis hed because it means that we doesn't have find our solution
+    /// return Some(DerivationTree ??) if it is finished because we have find our solution
     fn saturate(&mut self) -> Option<DerivationTree> {
         let mut rules_set: Vec<_> = self.rules.clone().into_iter().collect();
         let mut new_rules: HashSet<Rule<Identifier>> = HashSet::with_capacity(self.rules.len());
@@ -100,9 +103,9 @@ impl Sniffer {
         while let Some(rule) = rules_set.pop() {
             for other in new_rules.iter() {
                 if let Some(r) = rule.resolve(other) {
-                    println!("added: {r:?}");
-                    //  TEST
+                    //  TEST r est notre solution
                     if !new_rules.contains(&r) {
+                        println!("added: {r:?}");
                         rules_set.push(r)
                     }
                 }

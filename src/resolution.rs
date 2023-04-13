@@ -1,4 +1,7 @@
-use crate::ast::{InnerRule, Rule};
+use crate::{
+    ast::{Atom, InnerRule, Rule},
+    identifiers::Identifier,
+};
 
 pub enum Selection {
     Premise(usize),
@@ -12,8 +15,21 @@ impl InnerRule {
     /// Output : (Premise, i) or (Conclusion, None)
     /// - (Premise, i) if A_i is selected
     /// - (Conclusion, None) if B is selected
+    /// When we find Att(t) with t not a variable, we select it
+    /// else we select the conclusion
     pub fn select(&self) -> Selection {
-        // if there is an Att(t) with t not a variable
+        for (i, premise) in self.premises.iter().enumerate() {
+            if let Atom {
+                symbol: Identifier::Function(0),
+                parameters,
+            } = premise
+            {
+                if parameters.len() == 1 && parameters[0].is_variable() {
+                    return Selection::Premise(i);
+                }
+                return Selection::Premise(i);
+            }
+        }
         Selection::Conclusion
     }
 
@@ -26,17 +42,17 @@ impl InnerRule {
     pub fn resolve(&self, other: &InnerRule) -> Option<InnerRule> {
         match (self.select(), other.select()) {
             (Selection::Premise(p), Selection::Conclusion) => {
-                self.premises[p].unify(&other.conclusion)
-                    .map(|bindings| {
-                        let mut premises = self.premises.clone();
-                        premises.remove(p);
-                        premises.append(&mut other.premises.clone());
+                self.premises[p].unify(&other.conclusion).map(|bindings| {
+                    let mut premises = self.premises.clone();
+                    premises.remove(p);
+                    premises.append(&mut other.premises.clone());
 
-                        Rule {
-                            conclusion: self.conclusion.clone(),
-                            premises
-                        }.apply(&bindings)
-                    })
+                    Rule {
+                        conclusion: self.conclusion.clone(),
+                        premises,
+                    }
+                    .apply(&bindings)
+                })
             }
             (Selection::Conclusion, Selection::Premise(_)) => other.resolve(self),
             _ => None,

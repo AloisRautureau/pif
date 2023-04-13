@@ -1,8 +1,8 @@
 //! AST module
 //! High level representation of the constructs used in `.pif` files
+use crate::Identifier;
 use std::collections::HashMap;
 use std::hash::Hash;
-use crate::Identifier;
 
 pub type InnerTerm = Term<Identifier>;
 /// Represents parsed terms
@@ -11,6 +11,7 @@ pub enum Term<T> {
     Function { symbol: T, parameters: Vec<Term<T>> },
     Variable { symbol: T },
 }
+
 impl<T: Clone + Hash + Eq + PartialEq> Term<T> {
     pub fn symbol(&self) -> &T {
         match self {
@@ -24,6 +25,13 @@ impl<T: Clone + Hash + Eq + PartialEq> Term<T> {
             binding.clone()
         } else {
             self.clone()
+        }
+    }
+
+    pub fn is_variable(&self) -> bool {
+        match self {
+            Term::Variable { .. } => true,
+            _ => false,
         }
     }
 }
@@ -67,7 +75,12 @@ impl<T: Clone + Hash + Eq + PartialEq> Atom<T> {
     pub fn apply(&self, bindings: &HashMap<Term<T>, Term<T>>) -> Atom<T> {
         Atom {
             symbol: self.symbol.clone(),
-            parameters: self.parameters.iter().cloned().map(|t| t.apply(bindings)).collect()
+            parameters: self
+                .parameters
+                .iter()
+                .cloned()
+                .map(|t| t.apply(bindings))
+                .collect(),
         }
     }
 }
@@ -105,7 +118,12 @@ impl<T: Clone + Hash + Eq + PartialEq> Rule<T> {
     pub fn apply(&self, bindings: &HashMap<Term<T>, Term<T>>) -> Rule<T> {
         Rule {
             conclusion: self.conclusion.apply(bindings),
-            premises: self.premises.iter().cloned().map(|a| a.apply(bindings)).collect()
+            premises: self
+                .premises
+                .iter()
+                .cloned()
+                .map(|a| a.apply(bindings))
+                .collect(),
         }
     }
 }

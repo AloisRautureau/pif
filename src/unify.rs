@@ -1,4 +1,4 @@
-use crate::ast::{Atom, InnerAtom, InnerRule, InnerTerm, Rule, Term};
+use crate::ast::{InnerAtom, InnerTerm, Term};
 use crate::identifiers::Identifier;
 use std::collections::HashMap;
 
@@ -17,7 +17,7 @@ impl UnificationContext {
     pub fn bind(&mut self, symbol: Identifier, term: InnerTerm) -> bool {
         let node = self.nodes.entry(symbol).or_insert(VarInfo {
             marker: self.marker,
-            bound: None
+            bound: None,
         });
 
         if node.bound.is_none() {
@@ -36,7 +36,7 @@ impl UnificationContext {
     pub fn visit(&mut self, symbol: Identifier) -> bool {
         let node = self.nodes.entry(symbol).or_insert(VarInfo {
             marker: self.marker + 1,
-            bound: None
+            bound: None,
         });
 
         if node.marker != self.marker {
@@ -53,7 +53,7 @@ impl UnificationContext {
             current_term = Some(t);
             match t {
                 Term::Variable { symbol: s } if s != symbol => symbol = s,
-                _ => return current_term
+                _ => return current_term,
             }
         }
         current_term
@@ -88,7 +88,7 @@ impl InnerTerm {
 
             // If the leaves are equal, we can simply continue
             if t == u {
-                continue
+                continue;
             }
 
             // Otherwise, our actions depend on the types of `leaf1` and `leaf2`
@@ -99,7 +99,7 @@ impl InnerTerm {
                 (x @ Term::Variable { symbol: x_id }, f @ Term::Function { .. })
                 | (f @ Term::Function { .. }, x @ Term::Variable { symbol: x_id }) => {
                     if f.contains(x, &mut context) {
-                        return None
+                        return None;
                     } else {
                         context.bind(*x_id, f.clone());
                     }
@@ -120,7 +120,7 @@ impl InnerTerm {
                             to_visit.push(unify)
                         }
                     } else {
-                        return None
+                        return None;
                     }
                 }
             }
@@ -131,13 +131,16 @@ impl InnerTerm {
 
     pub fn find(&self, context: &UnificationContext) -> InnerTerm {
         match self {
-            Term::Variable { symbol } => if let Some(t) = context.deref(symbol) {
-                t
-            } else {
-                self
-            },
-            t => t
-        }.clone()
+            Term::Variable { symbol } => {
+                if let Some(t) = context.deref(symbol) {
+                    t
+                } else {
+                    self
+                }
+            }
+            t => t,
+        }
+        .clone()
     }
 
     /// Checks if this term contains variable `t`
@@ -158,7 +161,7 @@ impl InnerTerm {
                         to_visit.push(param)
                     }
                 } else {
-                    return false
+                    return false;
                 }
             }
         }
@@ -196,25 +199,43 @@ mod tests {
 
         let mut context = UnificationContext::default();
 
-        assert!(test_var_term.contains(&Term::Variable {
-            symbol: Identifier::Variable(0)
-        }, &mut context));
-        assert!(!test_var_term.contains(&Term::Variable {
-            symbol: Identifier::Variable(12)
-        }, &mut context));
+        assert!(test_var_term.contains(
+            &Term::Variable {
+                symbol: Identifier::Variable(0)
+            },
+            &mut context
+        ));
+        assert!(!test_var_term.contains(
+            &Term::Variable {
+                symbol: Identifier::Variable(12)
+            },
+            &mut context
+        ));
 
-        assert!(test_fun_term.contains(&Term::Variable {
-            symbol: Identifier::Variable(1)
-        }, &mut context));
-        assert!(test_fun_term.contains(&Term::Variable {
-            symbol: Identifier::Variable(0)
-        }, &mut context));
-        assert!(test_fun_term.contains(&Term::Variable {
-            symbol: Identifier::Variable(3)
-        }, &mut context));
-        assert!(!test_fun_term.contains(&Term::Variable {
-            symbol: Identifier::Variable(12)
-        }, &mut context));
+        assert!(test_fun_term.contains(
+            &Term::Variable {
+                symbol: Identifier::Variable(1)
+            },
+            &mut context
+        ));
+        assert!(test_fun_term.contains(
+            &Term::Variable {
+                symbol: Identifier::Variable(0)
+            },
+            &mut context
+        ));
+        assert!(test_fun_term.contains(
+            &Term::Variable {
+                symbol: Identifier::Variable(3)
+            },
+            &mut context
+        ));
+        assert!(!test_fun_term.contains(
+            &Term::Variable {
+                symbol: Identifier::Variable(12)
+            },
+            &mut context
+        ));
     }
 
     #[test]
@@ -241,21 +262,33 @@ mod tests {
         };
 
         let mut context = UnificationContext::default();
-        context.bind(Identifier::Variable(0), Term::Function {
-            symbol: Identifier::Function(2),
-            parameters: vec![]
-        });
-        context.bind(Identifier::Variable(1), Term::Variable {
-            symbol: Identifier::Variable(0),
-        });
-        context.bind(Identifier::Variable(2), Term::Function {
-            symbol: Identifier::Function(4),
-            parameters: vec![]
-        });
-        context.bind(Identifier::Variable(3), Term::Function {
-            symbol: Identifier::Function(5),
-            parameters: vec![]
-        });
+        context.bind(
+            Identifier::Variable(0),
+            Term::Function {
+                symbol: Identifier::Function(2),
+                parameters: vec![],
+            },
+        );
+        context.bind(
+            Identifier::Variable(1),
+            Term::Variable {
+                symbol: Identifier::Variable(0),
+            },
+        );
+        context.bind(
+            Identifier::Variable(2),
+            Term::Function {
+                symbol: Identifier::Function(4),
+                parameters: vec![],
+            },
+        );
+        context.bind(
+            Identifier::Variable(3),
+            Term::Function {
+                symbol: Identifier::Function(5),
+                parameters: vec![],
+            },
+        );
 
         let bindings = context.get_bindings();
         let applied_var = test_var_term.apply(&bindings);
@@ -311,7 +344,7 @@ mod tests {
         };
         let var_copy = var.clone();
 
-        let mut context = UnificationContext::default();
+        let mut _context = UnificationContext::default();
         assert!(var.unify(&var_copy).is_some());
     }
 
@@ -341,7 +374,9 @@ mod tests {
         let bindings = var.unify(&cst);
         assert!(bindings.is_some());
         assert_eq!(
-            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(0) }),
+            bindings.unwrap().get(&Term::Variable {
+                symbol: Identifier::Variable(0)
+            }),
             Some(&Term::Function {
                 symbol: Identifier::Function(0),
                 parameters: vec![]
@@ -361,7 +396,9 @@ mod tests {
         let bindings = x.unify(&y);
         assert!(bindings.is_some());
         assert_eq!(
-            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(0) }),
+            bindings.unwrap().get(&Term::Variable {
+                symbol: Identifier::Variable(0)
+            }),
             Some(&Term::Variable {
                 symbol: Identifier::Variable(1)
             })
@@ -399,7 +436,9 @@ mod tests {
         let bindings = incomplete_fun.unify(&complete_fun);
         assert!(bindings.is_some());
         assert_eq!(
-            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(0) }),
+            bindings.unwrap().get(&Term::Variable {
+                symbol: Identifier::Variable(0)
+            }),
             Some(&Term::Function {
                 symbol: Identifier::Function(2),
                 parameters: vec![]
@@ -445,7 +484,9 @@ mod tests {
         let bindings = x.unify(&y);
         assert!(bindings.is_some());
         assert_eq!(
-            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(0) }),
+            bindings.unwrap().get(&Term::Variable {
+                symbol: Identifier::Variable(0)
+            }),
             Some(&Term::Variable {
                 symbol: Identifier::Variable(1)
             })
@@ -496,7 +537,9 @@ mod tests {
         let bindings = nested_fun.unify(&fun);
         assert!(bindings.is_some());
         assert_eq!(
-            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(1) }),
+            bindings.unwrap().get(&Term::Variable {
+                symbol: Identifier::Variable(1)
+            }),
             Some(&Term::Function {
                 symbol: Identifier::Function(1),
                 parameters: vec![Term::Variable {

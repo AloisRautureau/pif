@@ -4,21 +4,21 @@ use crate::ast::*;
 use crate::derivation_tree::DerivationTree;
 use crate::identifiers::{Identifier, IdentifierServer};
 pub use crate::parser::Parser;
+use itertools::Itertools;
 use logos_nom_bridge::Tokens;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use itertools::Itertools;
 
 mod ast;
 mod derivation_tree;
 mod identifiers;
 mod lexer;
 mod parser;
+mod resolution;
 mod unify;
 mod union_find;
-mod resolution;
 
 /// Sniffer's job is to saturate a set of rules, by deriving the current set until no
 /// new rule can be added
@@ -56,14 +56,19 @@ impl Sniffer {
         let inner_atom = Atom::from((atom, &mut self.id_server));
         let inner_rule = Rule {
             conclusion: inner_atom,
-            premises: vec![]
+            premises: vec![],
         };
 
         // We keep saturating our rule set until we either find our atom or the set is fully saturated
         self.saturate();
 
         if self.rules.contains(&inner_rule) {
-            Ok(self.derivation_tree(&Rule { conclusion: atom.clone(), premises: vec![] }).unwrap())
+            Ok(self
+                .derivation_tree(&Rule {
+                    conclusion: atom.clone(),
+                    premises: vec![],
+                })
+                .unwrap()) // WTF ça crash
         } else {
             Err(SaturationFailure::Saturated)
         }
@@ -90,13 +95,16 @@ impl Sniffer {
     /// return E_2
     fn saturate(&mut self) -> Option<DerivationTree> {
         let mut rules_set: Vec<_> = self.rules.clone().into_iter().collect();
-        let mut new_rules = HashSet::with_capacity(self.rules.len());
+        let mut new_rules: HashSet<Rule<Identifier>> = HashSet::with_capacity(self.rules.len());
 
         while let Some(rule) = rules_set.pop() {
             for other in new_rules.iter() {
                 if let Some(r) = rule.resolve(other) {
                     println!("added: {r:?}");
-                    rules_set.push(r);
+                    //  TEST
+                    if !new_rules.contains(&r) {
+                        rules_set.push(r)
+                    }
                 }
             }
             new_rules.insert(rule);
@@ -106,7 +114,11 @@ impl Sniffer {
     }
 
     /// Adds a new rule, returning `false` if it was already present
-    pub fn add_rule(&mut self, rule: InnerRule, derived_from: Option<(InnerRule, InnerRule)>) -> bool {
+    pub fn add_rule(
+        &mut self,
+        rule: InnerRule,
+        derived_from: Option<(InnerRule, InnerRule)>,
+    ) -> bool {
         if self.rules.insert(rule.clone()) {
             if let Some(derived_from) = derived_from {
                 self.derived_from.insert(rule, derived_from);
@@ -138,7 +150,14 @@ impl Sniffer {
     }
 
     pub fn rules_to_string(&self) -> String {
-        self.rules.iter().filter_map(|r| Rule::try_from((r, &self.id_server)).ok().map(|v| v.to_string())).join("\n")
+        self.rules
+            .iter()
+            .filter_map(|r| {
+                Rule::try_from((r, &self.id_server))
+                    .ok()
+                    .map(|v| v.to_string())
+            })
+            .join("\n")
     }
 }
 

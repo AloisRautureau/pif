@@ -153,9 +153,15 @@ pub enum Selection {
 /// Output : (Premise, i) or (Conclusion, None)
 /// - (Premise, i) if A_i is selected
 /// - (Conclusion, None) if B is selected
+/// 
+/// When we find Att(t) with t not a variable -> select it
+/// else -> select the conclusion
 pub fn selection(r: &InnerRule) -> Selection {
-    // if there is an Att(t) with t not a variable
-
+    for (i, premise) in r.premises.iter().enumerate() {
+        if let Atom::Predicate(Predicate::Att(_)) = premise {
+            return Selection::Premise(i);
+        }
+    }
     Selection::Conclusion
 }
 

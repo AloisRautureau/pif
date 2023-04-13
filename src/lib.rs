@@ -105,7 +105,9 @@ impl Sniffer {
                 if let Some(r) = rule.resolve(other) {
                     //  TEST r est notre solution
                     if !new_rules.contains(&r) {
-                        println!("added: {r:?}");
+
+                        // conversion de r en Rule<String>
+                        println!("added: {}", Rule::try_from((&r, &self.id_server)).unwrap());
                         rules_set.push(r)
                     }
                 }

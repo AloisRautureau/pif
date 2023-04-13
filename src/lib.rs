@@ -36,7 +36,7 @@ impl Sniffer {
         if let Ok(mut file) = File::open(file) {
             file.read_to_string(&mut file_contents).unwrap();
         } else {
-            return Err(())
+            return Err(());
         }
         let parsed_rules =
             Parser::parse_rules(Tokens::new(&file_contents)).expect("failed to parse file");
@@ -68,15 +68,29 @@ impl Sniffer {
         Ok(self.derivation_tree(atom).unwrap())
     }
 
+    /// We derive new rules through resolution:
+    /// A /\ B => C (B selected)
+    /// D => B (B selected)
+    /// then we have A /\ D => C
+    /// 
+    /// Input : E
+    /// Output : E*
+    /// 
+    /// Pseudo code:
+    /// E_1 = E
+    /// E_2 = empty
+    /// 
+    /// while E_1 != empty :
+    ///     take C in E_1
+    ///     
+    ///     add to E_1 every rule from the selected resolution between :
+    ///         - C 
+    ///         - every element of E_2
+    ///     
+    ///     add C to E_2
+    /// 
+    /// return E_2
     fn saturate(&mut self) -> Result<(), SaturationFailure> {
-        // We derive new rules through resolution:
-        // A /\ B => C (B selected)
-        // D => B (B selected)
-        // then we have A /\ D => C
-        //
-        // In order to do so, we try to unify each and every axiom to every rule's premisses, until
-        // one matches. When this happens, the conclusion can be added to the set of axioms
-        // TODO: use a more clever selection function in order to avoid exponential/infinite growth
         let mut derived = vec![];
         for rule in &self.generative_rules {
             for input in self
@@ -183,7 +197,7 @@ impl Sniffer {
     }
 
     pub fn print_derived_from(&self) {
-        for (axiom, _) in &self.derived_from{
+        for (axiom, _) in &self.derived_from {
             let atome = Atom::try_from((axiom, &self.id_server)).unwrap();
             ptree::print_tree(&self.derivation_tree(&atome).unwrap()).unwrap();
         }

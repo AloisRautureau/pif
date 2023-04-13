@@ -72,24 +72,26 @@ impl Sniffer {
     /// A /\ B => C (B selected)
     /// D => B (B selected)
     /// then we have A /\ D => C
-    /// 
+    ///
     /// Input : E
     /// Output : E*
-    /// 
+    ///
     /// Pseudo code:
     /// E_1 = E
     /// E_2 = empty
-    /// 
+    ///
     /// while E_1 != empty :
     ///     take C in E_1
     ///     
     ///     add to E_1 every rule from the selected resolution between :
-    ///         - C 
+    ///         - C
     ///         - every element of E_2
     ///     
     ///     add C to E_2
-    /// 
+    ///
     /// return E_2
+    ///
+    ///
     fn saturate(&mut self) -> Result<(), SaturationFailure> {
         let mut derived = vec![];
         for rule in &self.generative_rules {
@@ -222,4 +224,50 @@ impl std::fmt::Display for Sniffer {
 pub enum SaturationFailure {
     Saturated,     // The saturation attempt did not create any new rule
     DerivedBottom, // The saturation derived a contradiction
+}
+
+pub enum Selection {
+    Premise(usize),
+    Conclusion,
+}
+
+/// Selection of an atom in a rule
+/// (n in 0..+inf)
+/// Input : r = A_1 /\ ... /\ A_n => B
+/// Output : (Premise, i) or (Conclusion, None)
+/// - (Premise, i) if A_i is selected
+/// - (Conclusion, None) if B is selected
+pub fn selection(r: InnerRule) -> Selection {
+    Selection::Conclusion
+}
+
+/// Resolution of r1 and r2
+/// r1 = |p| /\ q => r  (selected p)
+/// r2 = s /\ t => |c|  (selected c)
+/// if unfify(p, c) {
+///     return asssigned(q /\ s /\ t => r, unify_context)
+/// }
+pub fn resolution(r1: InnerRule, r2: InnerRule) -> Option<InnerRule> {
+    match (selection(r1), selection(r2)) {
+        (Selection::Premise(p), Selection::Conclusion) => {
+            if r1.premises[p] == r2.conclusion {
+                // TODO
+                // UNIFY r1.premises[p] and r2.conclusion
+                let mut premises = r1.premises.clone().remove(p);
+
+                premises.append(r2.premises.clone());
+
+                Some(
+                Rule {
+                    conclusion: r1.conclusion.clone(),
+                    premises,
+                }
+                )
+            } else {
+                None
+            }
+        }
+        (TermType::Conclusion, TermType::Premise(_)) => resolution(r2, r1),
+        _ => None,
+    }
 }

@@ -85,8 +85,18 @@ impl Sniffer {
     ///         - every element of E_2
     ///     add C to E_2
     /// return E_2
-    fn saturate(&mut self) -> Result<(), SaturationFailure> {
-        todo!()
+    fn saturate(&mut self) -> Option<DerivationTree> {
+        let mut rules_set: Vec<_> = self.rules.clone().into_iter().collect();
+        let mut new_rules = HashSet::with_capacity(self.rules.len());
+
+        while let Some(rule) = rules_set.pop() {
+            for other in new_rules.iter() {
+                // TODO: Resolution here, if returns Some(...), add it to new_rules
+            }
+            new_rules.insert(rule);
+        }
+        self.rules = new_rules;
+        None
     }
 
     /// Adds a new rule, returning `false` if it was already present

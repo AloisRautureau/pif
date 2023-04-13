@@ -10,6 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use crate::resolution::Selection;
 
 mod ast;
 mod derivation_tree;
@@ -55,12 +56,22 @@ impl Sniffer {
     pub fn find(&mut self, atom: &Atom<String>) -> Result<DerivationTree, SaturationFailure> {
         let inner_atom = Atom::from((atom, &mut self.id_server));
         let inner_rule = Rule {
-            conclusion: inner_atom,
+            conclusion: inner_atom.clone(),
             premises: vec![],
         };
 
+        // Create a selection function using the query
+        let select = move |r: &InnerRule| {
+            for p in r.premises.iter() {
+                if p.symbol == inner_atom.symbol && p.parameters.iter().all(|p| !p.is_variable()) {
+                    return Selection::Premise(p.clone())
+                }
+            }
+            Selection::Conclusion(r.conclusion.clone())
+        };
+
         // We keep saturating our rule set until we either find our atom or the set is fully saturated
-        self.saturate();
+        self.saturate(select);
 
         if self.rules.contains(&inner_rule) {
             Ok(self
@@ -96,12 +107,12 @@ impl Sniffer {
     /// 
     /// return None if it is finis hed because it means that we doesn't have find our solution
     /// return Some(DerivationTree ??) if it is finished because we have find our solution
-    fn saturate(&mut self) -> Option<DerivationTree> {
+    fn saturate(&mut self, select: impl Fn(&InnerRule) -> Selection) -> Option<DerivationTree> {
         let mut rules_set: Vec<_> = self.rules.clone().into_iter().collect();
 
         while let Some(rule) = rules_set.pop() {
             for other in &self.rules {
-                if let Some(r) = rule.resolve(other) {
+                if let Some(r) = rule.resolve(other, &select) {
                     if !self.rules.contains(&r) {
                         self.derived_from.insert(r.clone(), (rule.clone(), other.clone()));
                         rules_set.push(r)

@@ -244,7 +244,6 @@ mod tests {
                     },
                 ),
             ]),
-            marker: 0,
         };
 
         let applied_var = test_var_term.apply(&context);

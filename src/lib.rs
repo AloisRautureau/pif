@@ -70,7 +70,10 @@ impl Sniffer {
 
     fn saturate(&mut self) -> Result<(), SaturationFailure> {
         // We derive new rules through resolution:
-        // `p`, `p => q` |= `q`
+        // A /\ B => C (B selected)
+        // D => B (B selected)
+        // then we have A /\ D => C
+        //
         // In order to do so, we try to unify each and every axiom to every rule's premisses, until
         // one matches. When this happens, the conclusion can be added to the set of axioms
         // TODO: use a more clever selection function in order to avoid exponential/infinite growth

@@ -22,9 +22,8 @@ mod unify;
 /// new rule can be added
 #[derive(Default)]
 pub struct Sniffer {
-    generative_rules: HashSet<InnerRule>,
-    axioms: HashSet<InnerAtom>,
-    derived_from: HashMap<InnerAtom, Vec<InnerAtom>>,
+    rules: HashSet<InnerRule>,
+    derived_from: HashMap<InnerRule, Vec<InnerRule>>,
 
     id_server: IdentifierServer,
 }
@@ -49,7 +48,7 @@ impl Sniffer {
                 sniffer.add_axiom(inner_axiom);
             } else {
                 sniffer
-                    .generative_rules
+                    .clauses
                     .insert(Rule::from((&rule, &mut sniffer.id_server)));
             }
         }
@@ -110,9 +109,16 @@ impl Sniffer {
     }
 
     /// Adds a new axiom, returning `false` if it was already present
+    /*
     pub fn add_axiom(&mut self, axiom: InnerAtom) -> bool {
         self.derived_from.insert(axiom.clone(), vec![]);
         self.axioms.insert(axiom)
+    }
+    */
+
+    pub fn add_inner_rule(&mut self, rule: InnerRule) -> bool {
+        self.clauses.insert(rule);
+        self.derived_from.insert(axiom.clone(), vec![]);
     }
 
     /// Returns the derivation tree for a given axiom

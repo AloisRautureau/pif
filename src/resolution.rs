@@ -24,10 +24,9 @@ impl InnerRule {
                 parameters,
             } = premise
             {
-                if parameters.len() == 1 && parameters[0].is_variable() {
+                if parameters.len() >= 2 || (parameters.len() == 1 && !parameters[0].is_variable()) {
                     return Selection::Premise(i);
                 }
-                return Selection::Premise(i);
             }
         }
         Selection::Conclusion

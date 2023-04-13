@@ -30,13 +30,14 @@ pub struct Sniffer {
 }
 impl Sniffer {
     /// Creates a Sniffer context from a `.pif` file
-    pub fn new<P: AsRef<Path>>(file: P) -> Sniffer {
+    pub fn new<P: AsRef<Path>>(file: P) -> Result<Sniffer, ()> {
         // Parses the `.pif` file
         let mut file_contents = String::new();
-        File::open(file)
-            .unwrap()
-            .read_to_string(&mut file_contents)
-            .unwrap();
+        if let Ok(mut file) = File::open(file) {
+            file.read_to_string(&mut file_contents).unwrap();
+        } else {
+            return Err(())
+        }
         let parsed_rules =
             Parser::parse_rules(Tokens::new(&file_contents)).expect("failed to parse file");
 
@@ -52,7 +53,7 @@ impl Sniffer {
                     .insert(Rule::from((&rule, &mut sniffer.id_server)));
             }
         }
-        sniffer
+        Ok(sniffer)
     }
 
     /// Returns a derivation that results in a given rule if one exists
@@ -134,6 +135,51 @@ impl Sniffer {
             decision_tree.insert(inner(pre, self)?)
         }
         Some(decision_tree)
+    }
+
+    pub fn rules_to_string(&self) -> String {
+        let mut rules = String::new();
+        for rule in &self.generative_rules {
+            let rule = Rule::try_from((rule, &self.id_server)).unwrap();
+            rules.push_str(&format!("\t{}\n", rule));
+        }
+        rules
+    }
+
+    pub fn axioms_to_string(&self) -> String {
+        let mut axioms = String::new();
+        for axiom in &self.axioms {
+            let axiom = Atom::try_from((axiom, &self.id_server)).unwrap();
+            axioms.push_str(&format!("\t{}\n", axiom));
+        }
+        axioms
+    }
+
+    pub fn derived_from_to_string(&self) -> String {
+        let mut derived_from = String::new();
+        for (axiom, premises) in &self.derived_from {
+            let axiom = Atom::try_from((axiom, &self.id_server)).unwrap();
+            derived_from.push_str(&format!("\t{}:\n", axiom));
+            for p in premises {
+                let p = Atom::try_from((p, &self.id_server)).unwrap();
+                derived_from.push_str(&format!("\t\t{}\n", p));
+            }
+        }
+        derived_from
+    }
+}
+
+impl std::fmt::Display for Sniffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Rules:")?;
+        write!(f, "{}", self.rules_to_string())?;
+
+        writeln!(f, "Axioms: ")?;
+        write!(f, "{}", self.axioms_to_string())?;
+
+        writeln!(f, "Derived from: ")?;
+        write!(f, "{}", self.derived_from_to_string())?;
+        Ok(())
     }
 }
 

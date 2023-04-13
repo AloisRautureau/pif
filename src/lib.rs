@@ -36,7 +36,7 @@ impl Sniffer {
         if let Ok(mut file) = File::open(file) {
             file.read_to_string(&mut file_contents).unwrap();
         } else {
-            return Err(())
+            return Err(());
         }
         let parsed_rules =
             Parser::parse_rules(Tokens::new(&file_contents)).expect("failed to parse file");
@@ -66,6 +66,28 @@ impl Sniffer {
         Ok(self.derivation_tree(&Rule { conclusion: atom.clone(), premises: vec![] }).unwrap())
     }
 
+    /// We derive new rules through resolution:
+    /// A /\ B => C (B selected)
+    /// D => B (B selected)
+    /// then we have A /\ D => C
+    /// 
+    /// Input : E
+    /// Output : E*
+    /// 
+    /// Pseudo code:
+    /// E_1 = E
+    /// E_2 = empty
+    /// 
+    /// while E_1 != empty :
+    ///     take C in E_1
+    ///     
+    ///     add to E_1 every rule from the selected resolution between :
+    ///         - C 
+    ///         - every element of E_2
+    ///     
+    ///     add C to E_2
+    /// 
+    /// return E_2
     fn saturate(&mut self) -> Result<(), SaturationFailure> {
         todo!()
     }

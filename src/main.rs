@@ -1,5 +1,5 @@
 use logos_nom_bridge::Tokens;
-use pif::{Parser, Sniffer};
+use sniffer::{Parser, Sniffer};
 use std::env;
 
 fn main() {

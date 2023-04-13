@@ -58,80 +58,75 @@ impl UnificationContext {
         }
         current_term
     }
+
+    pub fn get_bindings(self) -> HashMap<InnerTerm, InnerTerm> {
+        let mut map = HashMap::with_capacity(self.nodes.len());
+        for symbol in self.nodes.keys().cloned() {
+            let value = self.deref(&symbol).cloned();
+            let ident = Term::Variable { symbol };
+            map.insert(ident.clone(), value.unwrap_or(ident));
+        }
+        map
+    }
 }
 
-impl InnerRule {
-    pub fn assign(&self, values: &[InnerAtom]) -> Result<InnerRule, ()> {
-        if self.premises.len() != values.len() {
-            return Err(());
-        }
-
-        let mut unification_context = UnificationContext::default();
-        if !self.premises.iter().zip(values)
-            .all(|(pre, val)| {
-                let pre = Term::from(pre.clone());
-                let val = Term::from(val.clone());
-                pre.unify(&val, &mut unification_context)
-            }) {
-            Err(())
-        } else {
-            Ok(Rule {
-                premises: Vec::from(values),
-                conclusion: Atom::try_from(
-                    Term::from(self.conclusion.clone()).apply(&unification_context),
-                )
-                    .unwrap(),
-            })
-        }
+impl InnerAtom {
+    fn unify(&self, other: &InnerAtom) -> Option<HashMap<InnerTerm, InnerTerm>> {
+        Term::from(self.clone()).unify(&Term::from(other.clone()))
     }
 }
 
 impl InnerTerm {
     /// Tries to unify this term with another
-    fn unify(&self, other: &InnerTerm, context: &mut UnificationContext) -> bool {
-        // Finds leaves of terms `self` and `other`
-        let (leaf1, leaf2) = (self.find(&context), other.find(&context));
+    fn unify(&self, other: &InnerTerm) -> Option<HashMap<InnerTerm, InnerTerm>> {
+        let mut context = UnificationContext::default();
+        let mut to_visit = vec![(self.clone(), other.clone())];
 
-        // If the leaves are equal, we can simply return
-        if leaf1 == leaf2 {
-            return true;
-        }
+        while let Some((t, u)) = to_visit.pop() {
+            // Finds leaves of terms `self` and `other`
+            let (t, u) = (t.find(&context), u.find(&context));
 
-        // Otherwise, our actions depend on the types of `leaf1` and `leaf2`
-        match (&leaf1, &leaf2) {
-            (Term::Variable { symbol }, Term::Variable { .. }) => {
-                context.bind(*symbol, leaf2);
-                true
+            // If the leaves are equal, we can simply continue
+            if t == u {
+                continue
             }
-            (x @ Term::Variable { symbol: x_id }, f @ Term::Function { .. })
-            | (f @ Term::Function { .. }, x @ Term::Variable { symbol: x_id }) => {
-                if f.contains(&x, context) {
-                    false
-                } else {
-                    context.bind(*x_id, f.clone());
-                    true
+
+            // Otherwise, our actions depend on the types of `leaf1` and `leaf2`
+            match (&t, &u) {
+                (Term::Variable { symbol }, Term::Variable { .. }) => {
+                    context.bind(*symbol, u);
+                }
+                (x @ Term::Variable { symbol: x_id }, f @ Term::Function { .. })
+                | (f @ Term::Function { .. }, x @ Term::Variable { symbol: x_id }) => {
+                    if f.contains(x, &mut context) {
+                        return None
+                    } else {
+                        context.bind(*x_id, f.clone());
+                    }
+                }
+                (
+                    Term::Function {
+                        symbol: f,
+                        parameters: f_params,
+                    },
+                    Term::Function {
+                        symbol: g,
+                        parameters: g_params,
+                    },
+                ) => {
+                    if f == g && f_params.len() == g_params.len() {
+                        context.bind(*f, u.clone());
+                        for unify in f_params.clone().into_iter().zip(g_params.clone()) {
+                            to_visit.push(unify)
+                        }
+                    } else {
+                        return None
+                    }
                 }
             }
-            (
-                Term::Function {
-                    symbol: f,
-                    parameters: u,
-                },
-                Term::Function {
-                    symbol: g,
-                    parameters: v,
-                },
-            ) => {
-                if f == g && u.len() == v.len() {
-                    context.bind(*f, leaf2.clone());
-                    u.iter()
-                        .zip(v.iter())
-                        .all(|(x, y)| x.unify(y, &mut *context))
-                } else {
-                    false
-                }
-            }
         }
+
+        Some(context.get_bindings())
     }
 
     pub fn find(&self, context: &UnificationContext) -> InnerTerm {
@@ -318,8 +313,7 @@ mod tests {
         };
         let var_copy = var.clone();
 
-        let mut context = UnificationContext::default();
-        assert!(var.unify(&var_copy, &mut context));
+        assert!(var.unify(&var_copy).is_some());
     }
 
     #[test]
@@ -330,7 +324,7 @@ mod tests {
         let var_copy = var.clone();
 
         let mut context = UnificationContext::default();
-        assert!(var.unify(&var_copy, &mut context));
+        assert!(var.unify(&var_copy).is_some());
     }
 
     #[test]
@@ -343,7 +337,7 @@ mod tests {
             symbol: Identifier::Function(1),
             parameters: vec![],
         };
-        assert!(!x.unify(&y, &mut UnificationContext::default()))
+        assert!(x.unify(&y).is_none())
     }
 
     #[test]
@@ -356,10 +350,10 @@ mod tests {
             parameters: vec![],
         };
 
-        let mut context = UnificationContext::default();
-        assert!(var.unify(&cst, &mut context));
+        let bindings = var.unify(&cst);
+        assert!(bindings.is_some());
         assert_eq!(
-            context.deref(&Identifier::Variable(0)),
+            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(0) }),
             Some(&Term::Function {
                 symbol: Identifier::Function(0),
                 parameters: vec![]
@@ -376,10 +370,10 @@ mod tests {
             symbol: Identifier::Variable(1),
         };
 
-        let mut context = UnificationContext::default();
-        assert!(x.unify(&y, &mut context));
+        let bindings = x.unify(&y);
+        assert!(bindings.is_some());
         assert_eq!(
-            context.deref(&Identifier::Variable(0)),
+            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(0) }),
             Some(&Term::Variable {
                 symbol: Identifier::Variable(1)
             })
@@ -414,10 +408,10 @@ mod tests {
             ],
         };
 
-        let mut context = UnificationContext::default();
-        assert!(incomplete_fun.unify(&complete_fun, &mut context));
+        let bindings = incomplete_fun.unify(&complete_fun);
+        assert!(bindings.is_some());
         assert_eq!(
-            context.deref(&Identifier::Variable(0)),
+            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(0) }),
             Some(&Term::Function {
                 symbol: Identifier::Function(2),
                 parameters: vec![]
@@ -442,7 +436,7 @@ mod tests {
             }],
         };
 
-        assert!(!x.unify(&y, &mut UnificationContext::default()));
+        assert!(x.unify(&y).is_none());
     }
 
     #[test]
@@ -460,10 +454,10 @@ mod tests {
             }],
         };
 
-        let mut context = UnificationContext::default();
-        assert!(x.unify(&y, &mut context));
+        let bindings = x.unify(&y);
+        assert!(bindings.is_some());
         assert_eq!(
-            context.deref(&Identifier::Variable(0)),
+            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(0) }),
             Some(&Term::Variable {
                 symbol: Identifier::Variable(1)
             })
@@ -490,7 +484,7 @@ mod tests {
             ],
         };
 
-        assert!(!unary_fun.unify(&binary_fun, &mut UnificationContext::default()));
+        assert!(unary_fun.unify(&binary_fun).is_none());
     }
 
     #[test]
@@ -511,10 +505,10 @@ mod tests {
             }],
         };
 
-        let mut context = UnificationContext::default();
-        assert!(nested_fun.unify(&fun, &mut context));
+        let bindings = nested_fun.unify(&fun);
+        assert!(bindings.is_some());
         assert_eq!(
-            context.deref(&Identifier::Variable(1)),
+            bindings.unwrap().get(&Term::Variable { symbol: Identifier::Variable(1) }),
             Some(&Term::Function {
                 symbol: Identifier::Function(1),
                 parameters: vec![Term::Variable {

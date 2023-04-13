@@ -80,13 +80,10 @@ impl Sniffer {
     /// 
     /// while E_1 != empty :
     ///     take C in E_1
-    ///     
     ///     add to E_1 every rule from the selected resolution between :
     ///         - C 
     ///         - every element of E_2
-    ///     
     ///     add C to E_2
-    /// 
     /// return E_2
     fn saturate(&mut self) -> Result<(), SaturationFailure> {
         todo!()

@@ -160,12 +160,23 @@ impl Sniffer {
         for (axiom, premises) in &self.derived_from {
             let axiom = Atom::try_from((axiom, &self.id_server)).unwrap();
             derived_from.push_str(&format!("\t{}:\n", axiom));
+
+            // draw derivation tree
+
             for p in premises {
                 let p = Atom::try_from((p, &self.id_server)).unwrap();
+                // ptree::print_tree(self.derivation_tree(&p));
                 derived_from.push_str(&format!("\t\t{}\n", p));
             }
         }
         derived_from
+    }
+
+    pub fn print_derived_from(&self) {
+        for (axiom, _) in &self.derived_from{
+            let atome = Atom::try_from((axiom, &self.id_server)).unwrap();
+            ptree::print_tree(&self.derivation_tree(&atome).unwrap()).unwrap();
+        }
     }
 }
 

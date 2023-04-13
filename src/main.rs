@@ -80,7 +80,10 @@ fn main() {
             Some("define") => todo!(),
             Some("remove") => todo!(),
             Some("print-sniffer") => {
-                println!("{}", sniffer);
+                println!("Rules:");
+                print!("{}", sniffer.rules_to_string());
+                println!("Derived from:");
+                sniffer.print_derived_from();
             },
             Some("rules") => {
                 println!("Rules:");
@@ -92,7 +95,7 @@ fn main() {
             }
             Some("derived-from") => {
                 println!("Derived from:");
-                print!("{}", sniffer.derived_from_to_string());
+                sniffer.print_derived_from();
             }
             Some("quit") => break,
             _ => println!("unrecognized command"),

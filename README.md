@@ -19,7 +19,7 @@ The executable takes an optional file path argument, which will load up the give
 |  `define`  |  `<premises> => <conclusion>` or `<axiom>`  | defines a new rule or axiom |
 | `remove` | `<premises> => <conclusion>` or `<axiom>` | removes the given rule or axiom if it exists |
 | `rules` |  | lists defined rules and axioms |
-| `load` | `<file>` | loads a new `.pif` file |
+| `open` | `<file>` | loads a new `.pif` file |
 | `dump` | `<file>` | dumps currently defined rules and axioms a `.pif` file |
 | `quit` | | mystery command |
 

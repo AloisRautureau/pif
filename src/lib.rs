@@ -143,7 +143,9 @@ pub enum Selection {
 /// Output : (Premise, i) or (Conclusion, None)
 /// - (Premise, i) if A_i is selected
 /// - (Conclusion, None) if B is selected
-pub fn selection(r: InnerRule) -> Selection {
+pub fn selection(r: &InnerRule) -> Selection {
+    // if there is an Att(t) with t not a variable
+
     Selection::Conclusion
 }
 
@@ -154,14 +156,14 @@ pub fn selection(r: InnerRule) -> Selection {
 ///     return asssigned(q /\ s /\ t => r, unify_context)
 /// }
 pub fn resolution(r1: InnerRule, r2: InnerRule) -> Option<InnerRule> {
-    match (selection(r1), selection(r2)) {
+    match (selection(&r1), selection(&r2)) {
         (Selection::Premise(p), Selection::Conclusion) => {
-            if r1.premises[p] == r2.conclusion {
-                // TODO
-                // UNIFY r1.premises[p] and r2.conclusion
-                let mut premises = r1.premises.clone().remove(p);
+            if let Some(bindings) = r1.premises[p].unify(&r2.conclusion) {
+                let mut premises: Vec<Atom<Identifier>> = r1.premises.clone();
+                premises.remove(p);
+                premises.append(&mut r2.premises.clone());
 
-                premises.append(r2.premises.clone());
+                // TODO assignement premises.assigned(&bindings);
 
                 Some(
                 Rule {

@@ -71,14 +71,14 @@ impl UnificationContext {
 }
 
 impl InnerAtom {
-    fn unify(&self, other: &InnerAtom) -> Option<HashMap<InnerTerm, InnerTerm>> {
+    pub fn unify(&self, other: &InnerAtom) -> Option<HashMap<InnerTerm, InnerTerm>> {
         Term::from(self.clone()).unify(&Term::from(other.clone()))
     }
 }
 
 impl InnerTerm {
     /// Tries to unify this term with another
-    fn unify(&self, other: &InnerTerm) -> Option<HashMap<InnerTerm, InnerTerm>> {
+    pub fn unify(&self, other: &InnerTerm) -> Option<HashMap<InnerTerm, InnerTerm>> {
         let mut context = UnificationContext::default();
         let mut to_visit = vec![(self.clone(), other.clone())];
 

@@ -1,6 +1,7 @@
 use logos_nom_bridge::Tokens;
 use sniffer::{Parser, Sniffer};
 use std::env;
+use itertools::Itertools;
 
 fn main() {
     let args = env::args().collect::<Vec<_>>();
@@ -11,8 +12,8 @@ fn main() {
         if let Ok(from_file) = Sniffer::new(file) {
             from_file
         } else {
-            println!("failed to load file");
-            return;
+            println!("failed to parse file");
+            Sniffer::default()
         }
     } else {
         Sniffer::default()
@@ -20,85 +21,92 @@ fn main() {
 
     let mut rl = rustyline::DefaultEditor::new().expect("failed to open repl");
     while let Ok(line) = rl.readline("sniffer >> ") {
+        let _ = rl.add_history_entry(line.clone());
         let mut words = line.split_whitespace();
-        match words.next() {
-            Some("load") => {
-                if let Some(file) = words.next() {
-                    if let Ok(from_file) = Sniffer::new(file) {
-                        sniffer = from_file;
-                    } else {
-                        println!("failed to load file");
-                    }
-                }
-            }
-            Some("dump") => todo!(),
+        let command = words.next().unwrap();
+        let query = words.join(" ");
 
-            Some("query") => {
-                let query = if let Some(query) = words.next() {
-                    query
-                } else {
-                    println!("missing argument: query <atom>");
-                    continue;
-                };
-
-                let query = if let Ok(query) = Parser::parse_query(Tokens::new(query)) {
-                    query
-                } else {
-                    println!("failed to parse query");
-                    continue;
-                };
-
-                if let Ok(derivation_tree) = sniffer.find(&query) {
-                    ptree::print_tree(&derivation_tree).unwrap();
-                } else {
-                    println!("no result found for query")
-                }
-            }
-
-            // TODO => debug print (for now the same as query)
-            Some("query-debug") => {
-                let query = if let Some(query) = words.next() {
-                    query
-                } else {
-                    println!("missing argument: query <atom>");
-                    continue;
-                };
-
-                let query = if let Ok(query) = Parser::parse_query(Tokens::new(query)) {
-                    query
-                } else {
-                    println!("failed to parse query");
-                    continue;
-                };
-
-                if let Ok(derivation_tree) = sniffer.find(&query) {
-                    ptree::print_tree(&derivation_tree).unwrap();
-                } else {
-                    println!("no result found for query")
-                }
-            }
-            Some("define") => todo!(),
-            Some("remove") => todo!(),
-            Some("print-sniffer") => {
-                println!("Rules:");
-                print!("{}", sniffer.rules_to_string());
-                println!("Derived from:");
-                sniffer.print_derived_from();
-            },
-            Some("rules") => {
-                println!("Rules:");
-                print!("{}", sniffer.rules_to_string());
-            }
-            Some("axioms") => {
-                println!("Axioms:");
-                print!("{}", sniffer.axioms_to_string());
-            }
-            Some("derived-from") => {
-                println!("Derived from:");
-                sniffer.print_derived_from();
-            }
-            Some("quit") => break,
-            _ => println!("unrecognized command"),
+        match handle_command(command, &query, &mut sniffer) {
+            CommandResult::ParsingError => eprintln!("parsing error"),
+            CommandResult::UnknownCommand => eprintln!("unknown command"),
+            CommandResult::FileError => eprintln!("failed to open/write to file"),
+            CommandResult::NotFoundQuery => eprintln!("no result for query"),
+            CommandResult::Quit => break,
+            _ => ()
         }
+    }
+}
+
+enum CommandResult {
+    OkCommand,
+    ParsingError,
+    UnknownCommand,
+    Quit,
+    FileError,
+    NotFoundQuery,
+}
+fn handle_command(command: &str, query: &str, sniffer: &mut Sniffer) -> CommandResult {
+    match command {
+        "load" => {
+            if let Ok(from_file) = Sniffer::new(query) {
+                *sniffer = from_file;
+                CommandResult::OkCommand
+            } else {
+                CommandResult::FileError
+            }
+        }
+        "dump" => CommandResult::OkCommand, //TODO
+
+        "query" => {
+            let query = if let Ok(query) = Parser::parse_query(Tokens::new(&query)) {
+                query
+            } else {
+                return CommandResult::NotFoundQuery
+            };
+
+            if let Ok(derivation_tree) = sniffer.find(&query) {
+                ptree::print_tree(&derivation_tree).unwrap();
+                CommandResult::OkCommand
+            } else {
+                CommandResult::NotFoundQuery
+            }
+        }
+        // TODO => debug print (for now the same as query)
+        "query-debug" => {
+            let query = if let Ok(query) = Parser::parse_query(Tokens::new(&query)) {
+                query
+            } else {
+                return CommandResult::ParsingError
+            };
+
+            if let Ok(derivation_tree) = sniffer.find(&query) {
+                ptree::print_tree(&derivation_tree).unwrap();
+                CommandResult::OkCommand
+            } else {
+                CommandResult::NotFoundQuery
+            }
+        }
+        "define" => CommandResult::OkCommand, //TODO
+        "remove" => CommandResult::OkCommand, //TODO
+
+        "rules" => {
+            println!("{}", sniffer.rules_to_string());
+            CommandResult::OkCommand
+        }
+        "derivation" => {
+            let rules = if let Ok(rules) = Parser::parse_rules(Tokens::new(&query)) {
+                rules
+            } else {
+                return CommandResult::ParsingError
+            };
+
+            for tree in rules.into_iter().filter_map(|r| sniffer.derivation_tree(&r)) {
+                ptree::print_tree(&tree).unwrap()
+            }
+            CommandResult::OkCommand
+        }
+
+        "quit" => CommandResult::Quit,
+        _ => CommandResult::UnknownCommand,
     }
 }

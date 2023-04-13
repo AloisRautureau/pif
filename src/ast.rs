@@ -29,10 +29,7 @@ impl<T: Clone + Hash + Eq + PartialEq> Term<T> {
     }
 
     pub fn is_variable(&self) -> bool {
-        match self {
-            Term::Variable { .. } => true,
-            _ => false,
-        }
+        matches!(self, Term::Variable { .. })
     }
 }
 /// Allows transformation of Atoms to Terms seamlessly

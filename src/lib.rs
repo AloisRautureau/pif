@@ -4,13 +4,13 @@ use crate::ast::*;
 use crate::derivation_tree::DerivationTree;
 use crate::identifiers::{Identifier, IdentifierServer};
 pub use crate::parser::Parser;
+use crate::resolution::Selection;
 use itertools::Itertools;
 use logos_nom_bridge::Tokens;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use crate::resolution::Selection;
 
 mod ast;
 mod derivation_tree;
@@ -64,7 +64,7 @@ impl Sniffer {
         let select = move |r: &InnerRule| {
             for p in r.premises.iter() {
                 if p.symbol == inner_atom.symbol && p.parameters.iter().all(|p| !p.is_variable()) {
-                    return Selection::Premise(p.clone())
+                    return Selection::Premise(p.clone());
                 }
             }
             Selection::Conclusion(r.conclusion.clone())
@@ -104,7 +104,7 @@ impl Sniffer {
     ///         - every element of E_2
     ///     add C to E_2
     /// return E_2
-    /// 
+    ///
     /// return None if it is finis hed because it means that we doesn't have find our solution
     /// return Some(DerivationTree ??) if it is finished because we have find our solution
     fn saturate(&mut self, select: impl Fn(&InnerRule) -> Selection) -> Option<DerivationTree> {
@@ -114,7 +114,8 @@ impl Sniffer {
             for other in &self.rules {
                 if let Some(r) = rule.resolve(other, &select) {
                     if !self.rules.contains(&r) {
-                        self.derived_from.insert(r.clone(), (rule.clone(), other.clone()));
+                        self.derived_from
+                            .insert(r.clone(), (rule.clone(), other.clone()));
                         rules_set.push(r)
                     }
                 }

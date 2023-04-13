@@ -165,19 +165,6 @@ impl InnerTerm {
 
         false
     }
-
-    /// Applies a context to a term, setting its variables to their associated valued
-    pub fn apply(&self, context: &UnificationContext) -> InnerTerm {
-        match self {
-            Term::Variable { .. } => {
-                self.find(context).clone()
-            }
-            Term::Function { symbol, parameters } => Term::Function {
-                symbol: *symbol,
-                parameters: parameters.iter().map(|t| t.apply(context)).collect(),
-            },
-        }
-    }
 }
 
 #[cfg(test)]
@@ -270,8 +257,9 @@ mod tests {
             parameters: vec![]
         });
 
-        let applied_var = test_var_term.apply(&context);
-        let applied_fun = test_fun_term.apply(&context);
+        let bindings = context.get_bindings();
+        let applied_var = test_var_term.apply(&bindings);
+        let applied_fun = test_fun_term.apply(&bindings);
         assert_eq!(
             applied_var,
             Term::Function {

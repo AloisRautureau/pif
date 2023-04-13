@@ -1,5 +1,7 @@
 //! AST module
 //! High level representation of the constructs used in `.pif` files
+use std::collections::HashMap;
+use std::hash::Hash;
 use crate::Identifier;
 
 pub type InnerTerm = Term<Identifier>;
@@ -9,11 +11,19 @@ pub enum Term<T> {
     Function { symbol: T, parameters: Vec<Term<T>> },
     Variable { symbol: T },
 }
-impl<T> Term<T> {
+impl<T: Clone + Hash + Eq + PartialEq> Term<T> {
     pub fn symbol(&self) -> &T {
         match self {
             Term::Variable { symbol } => symbol,
             Term::Function { symbol, .. } => symbol,
+        }
+    }
+    /// Applies a valuation of the variables to this rule
+    pub fn apply(&self, bindings: &HashMap<Term<T>, Term<T>>) -> Term<T> {
+        if let Some(binding) = bindings.get(self) {
+            binding.clone()
+        } else {
+            self.clone()
         }
     }
 }
@@ -52,6 +62,15 @@ pub struct Atom<T> {
     pub symbol: T,
     pub parameters: Vec<Term<T>>,
 }
+impl<T: Clone + Hash + Eq + PartialEq> Atom<T> {
+    /// Applies a valuation of the variables to this rule
+    pub fn apply(&self, bindings: &HashMap<Term<T>, Term<T>>) -> Atom<T> {
+        Atom {
+            symbol: self.symbol.clone(),
+            parameters: self.parameters.iter().cloned().map(|t| t.apply(bindings)).collect()
+        }
+    }
+}
 impl<T> TryFrom<Term<T>> for Atom<T> {
     type Error = ();
 
@@ -80,6 +99,15 @@ pub type InnerRule = Rule<Identifier>;
 pub struct Rule<T> {
     pub premises: Vec<Atom<T>>,
     pub conclusion: Atom<T>,
+}
+impl<T: Clone + Hash + Eq + PartialEq> Rule<T> {
+    /// Applies a valuation of the variables to this rule
+    pub fn apply(&self, bindings: &HashMap<Term<T>, Term<T>>) -> Rule<T> {
+        Rule {
+            conclusion: self.conclusion.apply(bindings),
+            premises: self.premises.iter().cloned().map(|a| a.apply(bindings)).collect()
+        }
+    }
 }
 impl<T: std::fmt::Display> std::fmt::Display for Rule<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

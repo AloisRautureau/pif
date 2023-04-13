@@ -135,26 +135,28 @@ impl Sniffer {
         fn inner(root: &InnerRule, sniffer: &Sniffer) -> Option<DerivationTree> {
             let mut decision_tree =
                 DerivationTree::new(Rule::try_from((root, &sniffer.id_server)).ok()?);
-            let premises = sniffer.derived_from.get(root)?;
-            if let Some(tree) = inner(&premises.0, sniffer) {
-                decision_tree.add_subtree(tree)
-            }
-            if let Some(tree) = inner(&premises.1, sniffer) {
-                decision_tree.add_subtree(tree)
-            }
+            if let Some(premises) = sniffer.derived_from.get(root) {
+                if let Some(tree) = inner(&premises.0, sniffer) {
+                    decision_tree.add_subtree(tree)
+                }
+                if let Some(tree) = inner(&premises.1, sniffer) {
+                    decision_tree.add_subtree(tree)
+                }
+            };
             Some(decision_tree)
         }
 
-        let inner_atom = Rule::try_from((root, &self.id_server)).ok()?;
+        let inner_rule = Rule::try_from((root, &self.id_server)).ok()?;
 
         let mut decision_tree = DerivationTree::new(root.clone());
-        let premises = self.derived_from.get(&inner_atom)?;
-        if let Some(tree) = inner(&premises.0, self) {
-            decision_tree.add_subtree(tree)
-        }
-        if let Some(tree) = inner(&premises.1, self) {
-            decision_tree.add_subtree(tree)
-        }
+        if let Some(premises) = self.derived_from.get(&inner_rule) {
+            if let Some(tree) = inner(&premises.0, self) {
+                decision_tree.add_subtree(tree)
+            }
+            if let Some(tree) = inner(&premises.1, self) {
+                decision_tree.add_subtree(tree)
+            }
+        };
         Some(decision_tree)
     }
 

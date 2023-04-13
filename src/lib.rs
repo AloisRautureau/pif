@@ -18,6 +18,7 @@ mod lexer;
 mod parser;
 mod unify;
 mod union_find;
+mod resolution;
 
 /// Sniffer's job is to saturate a set of rules, by deriving the current set until no
 /// new rule can be added
@@ -59,11 +60,13 @@ impl Sniffer {
         };
 
         // We keep saturating our rule set until we either find our atom or the set is fully saturated
-        while !self.rules.contains(&inner_rule) {
-            self.saturate()?
-        }
+        self.saturate();
 
-        Ok(self.derivation_tree(&Rule { conclusion: atom.clone(), premises: vec![] }).unwrap())
+        if self.rules.contains(&inner_rule) {
+            Ok(self.derivation_tree(&Rule { conclusion: atom.clone(), premises: vec![] }).unwrap())
+        } else {
+            Err(SaturationFailure::Saturated)
+        }
     }
 
     /// We derive new rules through resolution:
@@ -91,7 +94,10 @@ impl Sniffer {
 
         while let Some(rule) = rules_set.pop() {
             for other in new_rules.iter() {
-                // TODO: Resolution here, if returns Some(...), add it to new_rules
+                if let Some(r) = rule.resolve(other) {
+                    println!("added: {r:?}");
+                    rules_set.push(r);
+                }
             }
             new_rules.insert(rule);
         }
@@ -140,52 +146,4 @@ impl Sniffer {
 pub enum SaturationFailure {
     Saturated,     // The saturation attempt did not create any new rule
     DerivedBottom, // The saturation derived a contradiction
-}
-
-pub enum Selection {
-    Premise(usize),
-    Conclusion,
-}
-
-/// Selection of an atom in a rule
-/// (n in 0..+inf)
-/// Input : r = A_1 /\ ... /\ A_n => B
-/// Output : (Premise, i) or (Conclusion, None)
-/// - (Premise, i) if A_i is selected
-/// - (Conclusion, None) if B is selected
-pub fn selection(r: &InnerRule) -> Selection {
-    // if there is an Att(t) with t not a variable
-
-    Selection::Conclusion
-}
-
-/// Resolution of r1 and r2
-/// r1 = |p| /\ q => r  (selected p)
-/// r2 = s /\ t => |c|  (selected c)
-/// if unfify(p, c) {
-///     return asssigned(q /\ s /\ t => r, unify_context)
-/// }
-pub fn resolution(r1: InnerRule, r2: InnerRule) -> Option<InnerRule> {
-    match (selection(&r1), selection(&r2)) {
-        (Selection::Premise(p), Selection::Conclusion) => {
-            if let Some(bindings) = r1.premises[p].unify(&r2.conclusion) {
-                let mut premises: Vec<Atom<Identifier>> = r1.premises.clone();
-                premises.remove(p);
-                premises.append(&mut r2.premises.clone());
-
-                // TODO assignement premises.assigned(&bindings);
-
-                Some(
-                Rule {
-                    conclusion: r1.conclusion.clone(),
-                    premises,
-                }
-                )
-            } else {
-                None
-            }
-        }
-        (Selection::Conclusion, Selection::Premise(_)) => resolution(r2, r1),
-        _ => None,
-    }
 }

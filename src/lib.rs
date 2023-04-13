@@ -17,6 +17,7 @@ mod identifiers;
 mod lexer;
 mod parser;
 mod unify;
+mod union_find;
 
 /// Sniffer's job is to saturate a set of rules, by deriving the current set until no
 /// new rule can be added

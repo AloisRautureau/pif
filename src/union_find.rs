@@ -59,6 +59,9 @@ impl<T: Hash + Eq + PartialEq + Clone> UnionFind<T> {
             ..
         }) = self.nodes.get(&value)
         {
+            if &value == parent {
+                break;
+            }
             value = parent.clone();
             path.push(value.clone());
         }

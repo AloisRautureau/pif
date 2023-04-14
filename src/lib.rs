@@ -7,7 +7,6 @@ use logos_nom_bridge::Tokens;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::rc::Rc;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 

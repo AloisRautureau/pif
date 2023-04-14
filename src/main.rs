@@ -58,7 +58,7 @@ fn handle_command(command: &str, query: &str, sniffer: &mut Sniffer) -> CommandR
         "dump" => CommandResult::OkCommand, //TODO
 
         "query" => {
-            let query = if let Ok(query) = Parser::parse_query(Tokens::new(&query)) {
+            let query = if let Ok(query) = Parser::parse_query(Tokens::new(query)) {
                 query
             } else {
                 return CommandResult::NotFoundQuery;
@@ -73,7 +73,7 @@ fn handle_command(command: &str, query: &str, sniffer: &mut Sniffer) -> CommandR
         }
         // TODO => debug print (for now the same as query)
         "query-debug" => {
-            let query = if let Ok(query) = Parser::parse_query(Tokens::new(&query)) {
+            let query = if let Ok(query) = Parser::parse_query(Tokens::new(query)) {
                 query
             } else {
                 return CommandResult::ParsingError;
@@ -94,7 +94,7 @@ fn handle_command(command: &str, query: &str, sniffer: &mut Sniffer) -> CommandR
             CommandResult::OkCommand
         }
         "derivation" => {
-            let rules = if let Ok(rules) = Parser::parse_rules(Tokens::new(&query)) {
+            let rules = if let Ok(rules) = Parser::parse_rules(Tokens::new(query)) {
                 rules
             } else {
                 return CommandResult::ParsingError;

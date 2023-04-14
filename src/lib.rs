@@ -4,13 +4,13 @@ use crate::ast::*;
 use crate::derivation_tree::DerivationTree;
 use crate::identifiers::{Identifier, IdentifierServer};
 pub use crate::parser::Parser;
+use crate::resolution::Selection;
 use itertools::Itertools;
 use logos_nom_bridge::Tokens;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use crate::resolution::Selection;
 
 mod ast;
 mod derivation_tree;
@@ -26,7 +26,7 @@ mod union_find;
 #[derive(Default)]
 pub struct Sniffer {
     rules: HashSet<InnerRule>,
-    derived_from: HashMap<InnerRule, (InnerRule, InnerRule)>,
+    derived_from: HashMap<InnerRule, ((InnerRule, InnerRule), (Selection<Identifier>, Selection<Identifier>))>,
 
     id_server: IdentifierServer,
 }
@@ -47,7 +47,7 @@ impl Sniffer {
         let mut sniffer = Sniffer::default();
         for rule in parsed_rules {
             let inner_rule = Rule::from((&rule, &mut sniffer.id_server));
-            sniffer.add_rule(inner_rule, None);
+            sniffer.rules.insert(inner_rule);
         }
         Ok(sniffer)
     }
@@ -64,7 +64,7 @@ impl Sniffer {
         let select = move |r: &InnerRule| {
             for p in r.premises.iter() {
                 if p.symbol == inner_atom.symbol && p.parameters.iter().all(|p| !p.is_variable()) {
-                    return Selection::Premise(p.clone())
+                    return Selection::Premise(p.clone());
                 }
             }
             Selection::Conclusion(r.conclusion.clone())
@@ -104,17 +104,19 @@ impl Sniffer {
     ///         - every element of E_2
     ///     add C to E_2
     /// return E_2
-    /// 
+    ///
     /// return None if it is finis hed because it means that we doesn't have find our solution
     /// return Some(DerivationTree ??) if it is finished because we have find our solution
-    fn saturate(&mut self, select: impl Fn(&InnerRule) -> Selection) -> Option<DerivationTree> {
+    fn saturate(&mut self, select: impl Fn(&InnerRule) -> Selection<Identifier>) -> Option<DerivationTree> {
         let mut rules_set: Vec<_> = self.rules.clone().into_iter().collect();
 
         while let Some(rule) = rules_set.pop() {
             for other in &self.rules {
                 if let Some(r) = rule.resolve(other, &select) {
                     if !self.rules.contains(&r) {
-                        self.derived_from.insert(r.clone(), (rule.clone(), other.clone()));
+                        let selected = (select(&rule), select(&other));
+                        self.derived_from
+                            .insert(r.clone(), ((rule.clone(), other.clone()), selected));
                         rules_set.push(r)
                     }
                 }
@@ -125,46 +127,34 @@ impl Sniffer {
         None
     }
 
-    /// Adds a new rule, returning `false` if it was already present
-    pub fn add_rule(
-        &mut self,
-        rule: InnerRule,
-        derived_from: Option<(InnerRule, InnerRule)>,
-    ) -> bool {
-        if self.rules.insert(rule.clone()) {
-            if let Some(derived_from) = derived_from {
-                self.derived_from.insert(rule, derived_from);
-            }
-            true
-        } else {
-            false
-        }
-    }
-
     /// Returns the derivation tree for a given rule
     pub fn derivation_tree(&self, root: &Rule<String>) -> Option<DerivationTree> {
         fn inner(root: &InnerRule, sniffer: &Sniffer) -> Option<DerivationTree> {
-            let mut decision_tree =
+            let mut derivation_tree =
                 DerivationTree::new(Rule::try_from((root, &sniffer.id_server)).ok()?);
-            if let Some(premises) = sniffer.derived_from.get(root) {
-                if let Some(tree) = inner(&premises.0, sniffer) {
-                    decision_tree.add_subtree(tree)
+            if let Some((premises, selections)) = sniffer.derived_from.get(root) {
+                if let Some(mut tree) = inner(&premises.0, sniffer) {
+                    tree.set_selection(Selection::try_from((&selections.0, &sniffer.id_server)).unwrap());
+                    derivation_tree.add_subtree(tree)
                 }
-                if let Some(tree) = inner(&premises.1, sniffer) {
-                    decision_tree.add_subtree(tree)
+                if let Some(mut tree) = inner(&premises.1, sniffer) {
+                    tree.set_selection(Selection::try_from((&selections.1, &sniffer.id_server)).unwrap());
+                    derivation_tree.add_subtree(tree)
                 }
             };
-            Some(decision_tree)
+            Some(derivation_tree)
         }
 
         let inner_rule = Rule::try_from((root, &self.id_server)).ok()?;
 
         let mut decision_tree = DerivationTree::new(root.clone());
-        if let Some(premises) = self.derived_from.get(&inner_rule) {
-            if let Some(tree) = inner(&premises.0, self) {
+        if let Some((premises, selections)) = self.derived_from.get(&inner_rule) {
+            if let Some(mut tree) = inner(&premises.0, self) {
+                tree.set_selection(Selection::try_from((&selections.0, &self.id_server)).unwrap());
                 decision_tree.add_subtree(tree)
             }
-            if let Some(tree) = inner(&premises.1, self) {
+            if let Some(mut tree) = inner(&premises.1, self) {
+                tree.set_selection(Selection::try_from((&selections.1, &self.id_server)).unwrap());
                 decision_tree.add_subtree(tree)
             }
         };

@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use rustc_hash::FxHashMap;
 use crate::ast::{Atom, InnerAtom, InnerRule, InnerTerm, Rule, Term};
+use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 
 /// Inner representation for identifiers
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Copy, Clone, Debug)]
@@ -34,7 +34,7 @@ impl IdentifierServer {
         let identifier = Identifier::Variable(id);
         let symbol = String::from("VAR") + &id.to_string();
         self.ids_map.insert(identifier, symbol.clone());
-        self.names_map.insert(symbol.clone(), identifier);
+        self.names_map.insert(symbol, identifier);
         self.variables_count += 1;
         identifier
     }
@@ -42,8 +42,8 @@ impl IdentifierServer {
     /// Returns the name associated with the given identifier
     pub fn name_of(&self, id: &Identifier) -> Option<String> {
         match id {
-            Identifier::Function(i) => self.ids_map.get(id).cloned(),
-            Identifier::Variable(i) => Some(String::from("VAR") + &i.to_string())
+            Identifier::Function(_) => self.ids_map.get(id).cloned(),
+            Identifier::Variable(i) => Some(String::from("VAR") + &i.to_string()),
         }
     }
 
@@ -53,7 +53,11 @@ impl IdentifierServer {
 }
 
 impl Term<String> {
-    pub fn to_inner(&self, id_server: &mut IdentifierServer, bindings: &mut HashMap<String, Identifier>) -> InnerTerm {
+    pub fn to_inner(
+        &self,
+        id_server: &mut IdentifierServer,
+        bindings: &mut HashMap<String, Identifier>,
+    ) -> InnerTerm {
         match self {
             Term::Variable { symbol } => {
                 let identifier = if let Some(identifier) = bindings.get(symbol) {
@@ -64,7 +68,6 @@ impl Term<String> {
                     identifier
                 };
                 Term::Variable { symbol: identifier }
-
             }
             Term::Function { symbol, parameters } => Term::Function {
                 symbol: id_server.register_function(symbol),
@@ -73,14 +76,16 @@ impl Term<String> {
                     .cloned()
                     .map(|t| t.to_inner(id_server, bindings))
                     .collect(),
-            }
+            },
         }
     }
 }
 impl InnerTerm {
     pub fn to_string(&self, id_server: &IdentifierServer) -> Term<String> {
         match self {
-            Term::Variable { symbol } => Term::Variable { symbol: id_server.name_of(symbol).unwrap() },
+            Term::Variable { symbol } => Term::Variable {
+                symbol: id_server.name_of(symbol).unwrap(),
+            },
             Term::Function { symbol, parameters } => Term::Function {
                 symbol: id_server.name_of(symbol).unwrap(),
                 parameters: parameters
@@ -88,22 +93,25 @@ impl InnerTerm {
                     .cloned()
                     .map(|t| t.to_string(id_server))
                     .collect(),
-            }
+            },
         }
     }
 
-    pub fn make_fresh(&self, id_server: &mut IdentifierServer, bindings: &mut HashMap<Identifier, Identifier>) -> InnerTerm {
+    pub fn make_fresh(
+        &self,
+        id_server: &mut IdentifierServer,
+        bindings: &mut HashMap<Identifier, Identifier>,
+    ) -> InnerTerm {
         match self {
             Term::Variable { symbol } => {
                 let identifier = if let Some(identifier) = bindings.get(symbol) {
                     *identifier
                 } else {
                     let identifier = id_server.register_variable();
-                    bindings.insert(symbol.clone(), identifier);
+                    bindings.insert(*symbol, identifier);
                     identifier
                 };
                 Term::Variable { symbol: identifier }
-
             }
             Term::Function { symbol, parameters } => Term::Function {
                 symbol: *symbol,
@@ -112,40 +120,51 @@ impl InnerTerm {
                     .cloned()
                     .map(|t| t.make_fresh(id_server, bindings))
                     .collect(),
-            }
+            },
         }
     }
 }
 
 impl Atom<String> {
-    pub fn to_inner(&self, id_server: &mut IdentifierServer, bindings: &mut HashMap<String, Identifier>) -> InnerAtom {
+    pub fn to_inner(
+        &self,
+        id_server: &mut IdentifierServer,
+        bindings: &mut HashMap<String, Identifier>,
+    ) -> InnerAtom {
         Atom {
             symbol: id_server.register_function(&self.symbol),
-            parameters: self.parameters
+            parameters: self
+                .parameters
                 .iter()
                 .map(|t| t.to_inner(id_server, bindings))
-                .collect()
+                .collect(),
         }
     }
 }
 impl InnerAtom {
     pub fn to_string(&self, id_server: &IdentifierServer) -> Atom<String> {
-            Atom {
-                symbol: id_server.name_of(&self.symbol).unwrap().clone(),
-                parameters: self.parameters
-                    .iter()
-                    .map(|t| t.to_string(id_server))
-                    .collect()
-            }
+        Atom {
+            symbol: id_server.name_of(&self.symbol).unwrap(),
+            parameters: self
+                .parameters
+                .iter()
+                .map(|t| t.to_string(id_server))
+                .collect(),
+        }
     }
 
-    pub fn make_fresh(&self, id_server: &mut IdentifierServer, bindings: &mut HashMap<Identifier, Identifier>) -> InnerAtom {
+    pub fn make_fresh(
+        &self,
+        id_server: &mut IdentifierServer,
+        bindings: &mut HashMap<Identifier, Identifier>,
+    ) -> InnerAtom {
         Atom {
             symbol: self.symbol,
-            parameters: self.parameters
+            parameters: self
+                .parameters
                 .iter()
                 .map(|t| t.make_fresh(id_server, bindings))
-                .collect()
+                .collect(),
         }
     }
 }
@@ -155,10 +174,11 @@ impl Rule<String> {
         let mut bindings = HashMap::new();
         Rule {
             conclusion: self.conclusion.to_inner(id_server, &mut bindings),
-            premises: self.premises
+            premises: self
+                .premises
                 .iter()
                 .map(|a| a.to_inner(id_server, &mut bindings))
-                .collect()
+                .collect(),
         }
     }
 }
@@ -166,10 +186,11 @@ impl InnerRule {
     pub fn to_string(&self, id_server: &IdentifierServer) -> Rule<String> {
         Rule {
             conclusion: self.conclusion.to_string(id_server),
-            premises: self.premises
+            premises: self
+                .premises
                 .iter()
                 .map(|a| a.to_string(id_server))
-                .collect()
+                .collect(),
         }
     }
 
@@ -177,10 +198,11 @@ impl InnerRule {
         let mut bindings = HashMap::new();
         Rule {
             conclusion: self.conclusion.make_fresh(id_server, &mut bindings),
-            premises: self.premises
+            premises: self
+                .premises
                 .iter()
                 .map(|a| a.make_fresh(id_server, &mut bindings))
-                .collect()
+                .collect(),
         }
     }
 }

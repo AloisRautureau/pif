@@ -1,5 +1,5 @@
-use std::hash::Hash;
 use rustc_hash::FxHashMap;
+use std::hash::Hash;
 
 #[derive(Clone)]
 struct NodeInfo<T: Hash + Eq + PartialEq + Clone> {
@@ -52,7 +52,7 @@ impl<T: Hash + Eq + PartialEq + Clone> UnionFind<T> {
         // We insert the value if it does not already exist
         if !self.nodes.contains_key(&value) {
             self.insert(value.clone());
-            return value.clone();
+            return value;
         }
 
         let mut path = vec![value.clone()];
@@ -73,7 +73,7 @@ impl<T: Hash + Eq + PartialEq + Clone> UnionFind<T> {
         for n in path {
             self.nodes.get_mut(&n).unwrap().parent = Some(value.clone())
         }
-        value.clone()
+        value
     }
 
     pub fn find_equivalence(&self, mut value: T) -> Option<T> {
@@ -91,7 +91,7 @@ impl<T: Hash + Eq + PartialEq + Clone> UnionFind<T> {
             }
             value = parent.clone();
         }
-        Some(value.clone())
+        Some(value)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &T> {

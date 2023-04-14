@@ -1,15 +1,15 @@
-use std::collections::HashMap;
 use crate::ast::*;
 use crate::derivation_tree::DerivationTree;
 use crate::identifiers::{Identifier, IdentifierServer};
 pub use crate::parser::Parser;
 use crate::resolution::Selection;
+use itertools::Itertools;
 use logos_nom_bridge::Tokens;
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 mod ast;
 mod derivation_tree;
@@ -130,12 +130,18 @@ impl Sniffer {
 
         while let Some(rule) = rules_set.pop() {
             for other in &self.rules {
-                if let Some(r) = rule.resolve(other, &select, &keep).map(|r| r.make_fresh(&mut self.id_server)) {
+                if let Some(r) = rule
+                    .resolve(other, &select, &keep)
+                    .map(|r| r.make_fresh(&mut self.id_server))
+                {
                     if !(r.premises.len() == 1 && r.premises[0] == r.conclusion) && r != rule {
                         let selected = (select(&rule), select(other));
                         self.derived_from
                             .entry(r.clone())
-                            .or_insert_with(|| DerivationInfo { rules: (rule.clone(), other.clone()), selected_atoms: selected });
+                            .or_insert_with(|| DerivationInfo {
+                                rules: (rule.clone(), other.clone()),
+                                selected_atoms: selected,
+                            });
                         rules_set.push(r)
                     }
                 }
@@ -153,9 +159,12 @@ impl Sniffer {
     /// Returns the derivation tree for a given rule
     pub fn derivation_tree(&mut self, root: &Rule<String>) -> Option<DerivationTree> {
         fn inner(root: &InnerRule, sniffer: &Sniffer) -> Option<DerivationTree> {
-            let mut derivation_tree =
-                DerivationTree::new(root.to_string(&sniffer.id_server));
-            if let Some(DerivationInfo { rules, selected_atoms }) = sniffer.derived_from.get(root) {
+            let mut derivation_tree = DerivationTree::new(root.to_string(&sniffer.id_server));
+            if let Some(DerivationInfo {
+                rules,
+                selected_atoms,
+            }) = sniffer.derived_from.get(root)
+            {
                 if let Some(mut tree) = inner(&rules.0, sniffer) {
                     tree.set_selection(
                         Selection::try_from((&selected_atoms.0, &sniffer.id_server)).unwrap(),
@@ -175,13 +184,21 @@ impl Sniffer {
         let inner_rule = root.to_inner(&mut self.id_server);
 
         let mut decision_tree = DerivationTree::new(root.clone());
-        if let Some(DerivationInfo { rules, selected_atoms }) = self.derived_from.get(&inner_rule) {
+        if let Some(DerivationInfo {
+            rules,
+            selected_atoms,
+        }) = self.derived_from.get(&inner_rule)
+        {
             if let Some(mut tree) = inner(&rules.0, self) {
-                tree.set_selection(Selection::try_from((&selected_atoms.0, &self.id_server)).unwrap());
+                tree.set_selection(
+                    Selection::try_from((&selected_atoms.0, &self.id_server)).unwrap(),
+                );
                 decision_tree.add_subtree(tree)
             }
             if let Some(mut tree) = inner(&rules.1, self) {
-                tree.set_selection(Selection::try_from((&selected_atoms.1, &self.id_server)).unwrap());
+                tree.set_selection(
+                    Selection::try_from((&selected_atoms.1, &self.id_server)).unwrap(),
+                );
                 decision_tree.add_subtree(tree)
             }
         };
@@ -191,16 +208,12 @@ impl Sniffer {
     pub fn rules_to_string(&self) -> String {
         self.rules
             .iter()
-            .map(|r| {
-                r.to_string(&self.id_server).to_string()
-            })
+            .map(|r| r.to_string(&self.id_server).to_string())
             .join("\n")
     }
 
     pub fn iter_rules(&self) -> impl Iterator<Item = Rule<String>> + '_ {
-        self.rules
-            .iter()
-            .map(|r| r.to_string(&self.id_server))
+        self.rules.iter().map(|r| r.to_string(&self.id_server))
     }
 }
 

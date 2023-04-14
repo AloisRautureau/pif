@@ -29,7 +29,11 @@ impl TreeItem for DerivationTree {
     type Child = Self;
     fn write_self<W: Write>(&self, f: &mut W, style: &Style) -> std::io::Result<()> {
         if let Some(selection) = &self.selection {
-            write!(f, "{}", style.paint(&self.root.selection_empathized_string(selection.clone())))
+            write!(
+                f,
+                "{}",
+                style.paint(&self.root.selection_empathized_string(selection.clone()))
+            )
         } else {
             write!(f, "{}", style.paint(&self.root.to_string()))
         }

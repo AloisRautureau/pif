@@ -1,4 +1,4 @@
-use crate::ast::{Atom, InnerRule, Rule, Term};
+use crate::ast::{Atom, InnerRule, Rule};
 use crate::identifiers::{Identifier, IdentifierServer};
 
 #[derive(Clone)]
@@ -43,9 +43,7 @@ impl InnerRule {
                     premises,
                 };
                 rule = rule.apply(&bindings);
-                rule
-                    .premises
-                    .retain(|p| keep(p, &rule.conclusion));
+                rule.premises.retain(|p| keep(p, &rule.conclusion));
                 rule
             }),
             (Selection::Conclusion(_), Selection::Premise(_, _)) => {

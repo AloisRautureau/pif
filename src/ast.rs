@@ -1,11 +1,11 @@
 //! AST module
 //! High level representation of the constructs used in `.pif` files
-use std::fmt::Debug;
-use crate::Identifier;
-use rustc_hash::FxHashMap;
-use std::hash::Hash;
-use ptree::{Color, Style};
 use crate::resolution::Selection;
+use crate::Identifier;
+use ptree::{Color, Style};
+use rustc_hash::FxHashMap;
+use std::fmt::Debug;
+use std::hash::Hash;
 
 pub type InnerTerm = Term<Identifier>;
 /// Represents parsed terms
@@ -31,7 +31,7 @@ impl<T: Clone + Hash + Eq + PartialEq + Debug> Term<T> {
                 } else {
                     self.clone()
                 }
-            },
+            }
             Term::Function { symbol, parameters } => Term::Function {
                 symbol: symbol.clone(),
                 parameters: parameters
@@ -39,8 +39,7 @@ impl<T: Clone + Hash + Eq + PartialEq + Debug> Term<T> {
                     .cloned()
                     .map(|t| t.apply(bindings))
                     .collect(),
-            }
-
+            },
         }
     }
 
@@ -177,7 +176,7 @@ impl<T: std::fmt::Display> Rule<T> {
         let empathize_style = Style {
             foreground: Some(Color::Red),
             bold: true,
-            .. Style::default()
+            ..Style::default()
         };
 
         match selection {
@@ -223,10 +222,21 @@ fn format_vec<T: std::fmt::Display>(v: &[T], sep: &str) -> String {
         .join(sep)
 }
 
-fn format_vec_empathize<T: std::fmt::Display>(v: &[T], sep: &str, empathize: usize, empathize_style: Style) -> String {
+fn format_vec_empathize<T: std::fmt::Display>(
+    v: &[T],
+    sep: &str,
+    empathize: usize,
+    empathize_style: Style,
+) -> String {
     v.iter()
         .enumerate()
-        .map(|(i, x)| if i == empathize { empathize_style.paint(x).to_string() } else { x.to_string() })
+        .map(|(i, x)| {
+            if i == empathize {
+                empathize_style.paint(x).to_string()
+            } else {
+                x.to_string()
+            }
+        })
         .collect::<Vec<_>>()
         .join(sep)
 }

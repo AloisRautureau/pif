@@ -84,9 +84,10 @@ fn handle_command(command: &str, query: &str, sniffer: &mut Sniffer) -> CommandR
         }
         "derivation" => {
             if query.is_empty() {
-                todo!();
-                for tree in sniffer
-                    .iter_rules()
+                let rules: Vec<_> = sniffer.iter_rules().collect();
+
+                for tree in rules
+                    .into_iter()
                     .filter_map(|r| sniffer.derivation_tree(&r))
                 {
                     ptree::print_tree(&tree).unwrap()

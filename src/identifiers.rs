@@ -1,5 +1,5 @@
 use crate::ast::Term;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 /// Inner representation for identifiers
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Copy, Clone, Debug)]
@@ -11,8 +11,8 @@ pub enum Identifier {
 pub struct IdentifierServer {
     variables_count: usize,
     functions_count: usize,
-    ids_map: HashMap<Identifier, String>,
-    names_map: HashMap<String, Identifier>,
+    ids_map: FxHashMap<Identifier, String>,
+    names_map: FxHashMap<String, Identifier>,
 }
 impl IdentifierServer {
     /// Registers a new term, returning its identifier

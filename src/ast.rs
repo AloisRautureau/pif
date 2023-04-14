@@ -1,8 +1,10 @@
 //! AST module
 //! High level representation of the constructs used in `.pif` files
 use crate::Identifier;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::hash::Hash;
+use ptree::{Color, Style};
+use crate::resolution::Selection;
 
 pub type InnerTerm = Term<Identifier>;
 /// Represents parsed terms
@@ -20,7 +22,7 @@ impl<T: Clone + Hash + Eq + PartialEq> Term<T> {
         }
     }
     /// Applies a valuation of the variables to this rule
-    pub fn apply(&self, bindings: &HashMap<Term<T>, Term<T>>) -> Term<T> {
+    pub fn apply(&self, bindings: &FxHashMap<Term<T>, Term<T>>) -> Term<T> {
         if let Some(binding) = bindings.get(self) {
             binding.clone()
         } else {
@@ -79,7 +81,7 @@ pub struct Atom<T> {
 }
 impl<T: Clone + Hash + Eq + PartialEq> Atom<T> {
     /// Applies a valuation of the variables to this rule
-    pub fn apply(&self, bindings: &HashMap<Term<T>, Term<T>>) -> Atom<T> {
+    pub fn apply(&self, bindings: &FxHashMap<Term<T>, Term<T>>) -> Atom<T> {
         Atom {
             symbol: self.symbol.clone(),
             parameters: self
@@ -138,7 +140,7 @@ pub struct Rule<T> {
 }
 impl<T: Clone + Hash + Eq + PartialEq> Rule<T> {
     /// Applies a valuation of the variables to this rule
-    pub fn apply(&self, bindings: &HashMap<Term<T>, Term<T>>) -> Rule<T> {
+    pub fn apply(&self, bindings: &FxHashMap<Term<T>, Term<T>>) -> Rule<T> {
         Rule {
             conclusion: self.conclusion.apply(bindings),
             premises: self
@@ -147,6 +149,40 @@ impl<T: Clone + Hash + Eq + PartialEq> Rule<T> {
                 .cloned()
                 .map(|a| a.apply(bindings))
                 .collect(),
+        }
+    }
+}
+
+impl<T: std::fmt::Display> Rule<T> {
+    pub fn selection_empathized_string(&self, selection: Selection<String>) -> String {
+        let Rule {
+            premises,
+            conclusion,
+        } = self;
+
+        let empathize_style = Style {
+            foreground: Some(Color::Red),
+            bold: true,
+            .. Style::default()
+        };
+
+        match selection {
+            Selection::Conclusion(_) => {
+                if premises.is_empty() {
+                    format!("{}", empathize_style.paint(conclusion))
+                } else {
+                    let premises_pp = format_vec(premises, " /\\ ");
+                    format!("{premises_pp} => {}", empathize_style.paint(conclusion))
+                }
+            }
+            Selection::Premise(_, i) => {
+                if premises.is_empty() {
+                    format!("{conclusion}")
+                } else {
+                    let premises_pp = format_vec_empathize(premises, " /\\ ", i, empathize_style);
+                    format!("{premises_pp} => {conclusion}")
+                }
+            }
         }
     }
 }
@@ -169,6 +205,14 @@ impl<T: std::fmt::Display> std::fmt::Display for Rule<T> {
 fn format_vec<T: std::fmt::Display>(v: &[T], sep: &str) -> String {
     v.iter()
         .map(|x| x.to_string())
+        .collect::<Vec<_>>()
+        .join(sep)
+}
+
+fn format_vec_empathize<T: std::fmt::Display>(v: &[T], sep: &str, empathize: usize, empathize_style: Style) -> String {
+    v.iter()
+        .enumerate()
+        .map(|(i, x)| if i == empathize { empathize_style.paint(x).to_string() } else { x.to_string() })
         .collect::<Vec<_>>()
         .join(sep)
 }

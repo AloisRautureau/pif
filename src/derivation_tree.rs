@@ -1,6 +1,6 @@
 use crate::ast::Rule;
 use crate::resolution::Selection;
-use ptree::{Color, Style, TreeItem};
+use ptree::{Style, TreeItem};
 use std::borrow::Cow;
 use std::io::Write;
 
@@ -28,27 +28,10 @@ impl DerivationTree {
 impl TreeItem for DerivationTree {
     type Child = Self;
     fn write_self<W: Write>(&self, f: &mut W, style: &Style) -> std::io::Result<()> {
-        let mut selected_style = style.clone();
-        selected_style.foreground = Some(Color::Red);
-        selected_style.bold = true;
-
-        let str_select = self.selection.as_ref().map(|selection| {
-            let (Selection::Conclusion(a) | Selection::Premise(a, _)) = selection;
-            a.to_string()
-        });
-
-        let string = self.root.to_string();
-        if let Some(selected_str) = str_select {
-            let mut non_selected = string.split(&selected_str);
-            write!(
-                f,
-                "{}{}{}",
-                style.paint(non_selected.next().unwrap_or(&String::new())),
-                selected_style.paint(&selected_str),
-                style.paint(non_selected.next().unwrap_or(&String::new()))
-            )
+        if let Some(selection) = &self.selection {
+            write!(f, "{}", style.paint(&self.root.selection_empathized_string(selection.clone())))
         } else {
-            write!(f, "{}", style.paint(string))
+            write!(f, "{}", style.paint(&self.root.to_string()))
         }
     }
     fn children(&self) -> Cow<[Self::Child]> {

@@ -1,16 +1,14 @@
-extern crate core;
-
 use crate::ast::*;
 use crate::derivation_tree::DerivationTree;
 use crate::identifiers::{Identifier, IdentifierServer};
 pub use crate::parser::Parser;
 use crate::resolution::Selection;
-use itertools::Itertools;
 use logos_nom_bridge::Tokens;
-use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use itertools::Itertools;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 mod ast;
 mod derivation_tree;
@@ -25,8 +23,8 @@ mod union_find;
 /// new rule can be added
 #[derive(Default)]
 pub struct Sniffer {
-    pub rules: HashSet<InnerRule>,
-    derived_from: HashMap<
+    pub rules: FxHashSet<InnerRule>,
+    derived_from: FxHashMap<
         InnerRule,
         (
             (InnerRule, InnerRule),
@@ -133,7 +131,7 @@ impl Sniffer {
             for other in &self.rules {
                 if let Some(r) = rule.resolve(other, &select, &keep) {
                     if r != rule && !self.rules.contains(&r) {
-                        let selected = (select(&rule), select(&other));
+                        let selected = (select(&rule), select(other));
                         self.derived_from
                             .entry(r.clone())
                             .or_insert_with(|| ((rule.clone(), other.clone()), selected));

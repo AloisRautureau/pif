@@ -38,14 +38,12 @@ impl InnerRule {
                 premises.append(&mut other.premises.clone());
                 let mut rule = Rule {
                     conclusion: self.conclusion.clone(),
-                    premises: premises,
+                    premises,
                 };
                 rule = rule.apply(&bindings);
-                rule.premises = rule
+                rule
                     .premises
-                    .into_iter()
-                    .filter(|p| keep(p, &rule.conclusion))
-                    .collect();
+                    .retain(|p| keep(p, &rule.conclusion));
                 rule
             }),
             /*

@@ -1,4 +1,4 @@
-use crate::ast::{Atom, InnerRule, Rule};
+use crate::ast::{Atom, InnerRule, Rule, Term};
 use crate::identifiers::{Identifier, IdentifierServer};
 
 #[derive(Clone)]

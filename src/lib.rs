@@ -75,7 +75,7 @@ impl Sniffer {
 
         // Filter for not useful atoms
         let keep = move |a: &Atom<Identifier>, c: &Atom<Identifier>| {
-            if a.is_symbol(inner_atom.symbol) && a.is_smth_of_variable() {
+            if a.symbol == inner_atom.symbol && a.is_smth_of_variable() {
                 c.contains_variable(&a.parameters[0])
             } else {
                 true
@@ -130,7 +130,7 @@ impl Sniffer {
         while let Some(rule) = rules_set.pop() {
             for other in &self.rules {
                 if let Some(r) = rule.resolve(other, &select, &keep) {
-                    if !(r.premises.len() == 1 && r.premises[0] == r.conclusion) && r != rule && !self.rules.contains(&r) {
+                    if !(r.premises.len() == 1 && r.premises[0] == r.conclusion) && r != rule {
                         let selected = (select(&rule), select(other));
                         self.derived_from
                             .entry(r.clone())

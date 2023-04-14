@@ -57,7 +57,7 @@ impl UnificationGraph {
     pub fn deref_mut(&mut self, term: InnerTerm) -> InnerTerm {
         let root = self.equivalence_classes.find_equivalence_mut(term);
         if let Some(VarInfo { bound: Some(t), .. }) = self.nodes.get(root.symbol()) {
-            self.deref_mut(t.clone())
+            self.equivalence_classes.find_equivalence_mut(t.clone())
         } else {
             root
         }
@@ -76,10 +76,10 @@ impl UnificationGraph {
         }
     }
 
-    pub fn bindings(self) -> FxHashMap<InnerTerm, InnerTerm> {
+    pub fn bindings(mut self) -> FxHashMap<InnerTerm, InnerTerm> {
         let mut bindings = HashMap::default();
-        for t in self.equivalence_classes.iter() {
-            bindings.insert(t.clone(), self.deref(t.clone()).unwrap_or(t.clone()));
+        for t in self.equivalence_classes.clone().iter() {
+            bindings.insert(t.clone(), self.deref_mut(t.clone()));
         }
         bindings
     }

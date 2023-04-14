@@ -1,6 +1,7 @@
 use std::hash::Hash;
 use rustc_hash::FxHashMap;
 
+#[derive(Clone)]
 struct NodeInfo<T: Hash + Eq + PartialEq + Clone> {
     pub parent: Option<T>,
     pub rank: usize,
@@ -14,6 +15,7 @@ impl<T: Hash + Eq + PartialEq + Clone> Default for NodeInfo<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct UnionFind<T: Hash + Eq + PartialEq + Clone> {
     nodes: FxHashMap<T, NodeInfo<T>>,
 }

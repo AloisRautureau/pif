@@ -1,5 +1,6 @@
 //! AST module
 //! High level representation of the constructs used in `.pif` files
+use std::fmt::Debug;
 use crate::Identifier;
 use rustc_hash::FxHashMap;
 use std::hash::Hash;
@@ -14,7 +15,7 @@ pub enum Term<T> {
     Variable { symbol: T },
 }
 
-impl<T: Clone + Hash + Eq + PartialEq> Term<T> {
+impl<T: Clone + Hash + Eq + PartialEq + Debug> Term<T> {
     pub fn symbol(&self) -> &T {
         match self {
             Term::Variable { symbol } => symbol,
@@ -23,10 +24,23 @@ impl<T: Clone + Hash + Eq + PartialEq> Term<T> {
     }
     /// Applies a valuation of the variables to this rule
     pub fn apply(&self, bindings: &FxHashMap<Term<T>, Term<T>>) -> Term<T> {
-        if let Some(binding) = bindings.get(self) {
-            binding.clone()
-        } else {
-            self.clone()
+        match self {
+            Term::Variable { .. } => {
+                if let Some(binding) = bindings.get(self) {
+                    binding.clone()
+                } else {
+                    self.clone()
+                }
+            },
+            Term::Function { symbol, parameters } => Term::Function {
+                symbol: symbol.clone(),
+                parameters: parameters
+                    .iter()
+                    .cloned()
+                    .map(|t| t.apply(bindings))
+                    .collect(),
+            }
+
         }
     }
 
@@ -79,7 +93,7 @@ pub struct Atom<T> {
     pub symbol: T,
     pub parameters: Vec<Term<T>>,
 }
-impl<T: Clone + Hash + Eq + PartialEq> Atom<T> {
+impl<T: Clone + Hash + Eq + PartialEq + Debug> Atom<T> {
     /// Applies a valuation of the variables to this rule
     pub fn apply(&self, bindings: &FxHashMap<Term<T>, Term<T>>) -> Atom<T> {
         Atom {
@@ -138,7 +152,7 @@ pub struct Rule<T> {
     pub premises: Vec<Atom<T>>,
     pub conclusion: Atom<T>,
 }
-impl<T: Clone + Hash + Eq + PartialEq> Rule<T> {
+impl<T: Clone + Hash + Eq + PartialEq + Debug> Rule<T> {
     /// Applies a valuation of the variables to this rule
     pub fn apply(&self, bindings: &FxHashMap<Term<T>, Term<T>>) -> Rule<T> {
         Rule {

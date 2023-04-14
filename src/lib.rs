@@ -131,16 +131,20 @@ impl Sniffer {
         while let Some(rule) = rules_set.pop() {
             for other in &self.rules {
                 if let Some(r) = rule.resolve(other, &select, &keep) {
-                    if !self.rules.contains(&r) {
+                    if r != rule && !self.rules.contains(&r) {
                         let selected = (select(&rule), select(&other));
                         self.derived_from
-                            .insert(r.clone(), ((rule.clone(), other.clone()), selected));
-
+                            .entry(r.clone())
+                            .or_insert_with(|| ((rule.clone(), other.clone()), selected));
                         rules_set.push(r)
                     }
                 }
             }
-            self.rules.insert(rule);
+
+            self.rules.insert(rule.clone());
+            if &rule == searching {
+                return None
+            }
         }
 
         None

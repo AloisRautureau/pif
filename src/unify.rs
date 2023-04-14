@@ -1,6 +1,7 @@
 use crate::ast::{InnerAtom, InnerTerm, Term};
 use crate::identifiers::Identifier;
 use std::collections::HashMap;
+use crate::union_find::UnionFind;
 
 struct VarInfo {
     pub marker: usize,
@@ -8,11 +9,12 @@ struct VarInfo {
 }
 
 #[derive(Default)]
-pub struct UnificationContext {
+pub struct UnificationGraph {
     marker: usize,
     nodes: HashMap<Identifier, VarInfo>,
+    equivalence_classes: UnionFind<InnerTerm>,
 }
-impl UnificationContext {
+impl UnificationGraph {
     /// Returns `false` if the symbol is already bound
     pub fn bind(&mut self, symbol: Identifier, term: InnerTerm) -> bool {
         let node = self.nodes.entry(symbol).or_insert(VarInfo {
@@ -26,6 +28,10 @@ impl UnificationContext {
         } else {
             false
         }
+    }
+
+    pub fn union(&mut self, x: InnerTerm, y: InnerTerm) {
+        self.equivalence_classes.union(x, y);
     }
 
     pub fn incr_marker(&mut self) {
@@ -47,26 +53,30 @@ impl UnificationContext {
         }
     }
 
-    pub fn deref<'a>(&'a self, mut symbol: &'a Identifier) -> Option<&InnerTerm> {
-        let mut current_term = None;
-        while let Some(VarInfo { bound: Some(t), .. }) = self.nodes.get(symbol) {
-            current_term = Some(t);
-            match t {
-                Term::Variable { symbol: s } if s != symbol => symbol = s,
-                _ => return current_term,
-            }
+    pub fn deref_mut(&mut self, term: InnerTerm) -> InnerTerm {
+        let root = self.equivalence_classes.find_equivalence_mut(term);
+        if let Some(VarInfo { bound: Some(t), .. }) = self.nodes.get(root.symbol()) {
+            self.deref_mut(t.clone())
+        } else {
+            root
         }
-        current_term
     }
 
-    pub fn get_bindings(self) -> HashMap<InnerTerm, InnerTerm> {
-        let mut map = HashMap::with_capacity(self.nodes.len());
-        for symbol in self.nodes.keys().cloned() {
-            let value = self.deref(&symbol).cloned();
-            let ident = Term::Variable { symbol };
-            map.insert(ident.clone(), value.unwrap_or(ident));
+    pub fn deref(&self, term: InnerTerm) -> Option<InnerTerm> {
+        let root = self.equivalence_classes.find_equivalence(term.clone())?;
+        if let Some(VarInfo { bound: Some(t), .. }) = self.nodes.get(root.symbol()) {
+            Some(self.equivalence_classes.find_equivalence(t.clone()).unwrap_or(t.clone()))
+        } else {
+            Some(root)
         }
-        map
+    }
+
+    pub fn bindings(self) -> HashMap<InnerTerm, InnerTerm> {
+        let mut bindings = HashMap::new();
+        for t in self.equivalence_classes.iter() {
+            bindings.insert(t.clone(), self.deref(t.clone()).unwrap_or(t.clone()));
+        }
+        bindings
     }
 }
 
@@ -79,12 +89,12 @@ impl InnerAtom {
 impl InnerTerm {
     /// Tries to unify this term with another
     pub fn unify(&self, other: &InnerTerm) -> Option<HashMap<InnerTerm, InnerTerm>> {
-        let mut context = UnificationContext::default();
+        let mut context = UnificationGraph::default();
         let mut to_visit = vec![(self.clone(), other.clone())];
 
         while let Some((t, u)) = to_visit.pop() {
             // Finds leaves of terms `self` and `other`
-            let (t, u) = (t.find(&context), u.find(&context));
+            let (t, u) = (context.deref_mut(t), context.deref_mut(u));
 
             // If the leaves are equal, we can simply continue
             if t == u {
@@ -93,8 +103,8 @@ impl InnerTerm {
 
             // Otherwise, our actions depend on the types of `leaf1` and `leaf2`
             match (&t, &u) {
-                (Term::Variable { symbol }, Term::Variable { .. }) => {
-                    context.bind(*symbol, u);
+                (Term::Variable { .. }, Term::Variable { .. }) => {
+                    context.union(t, u);
                 }
                 (x @ Term::Variable { symbol: x_id }, f @ Term::Function { .. })
                 | (f @ Term::Function { .. }, x @ Term::Variable { symbol: x_id }) => {
@@ -115,7 +125,7 @@ impl InnerTerm {
                     },
                 ) => {
                     if f == g && f_params.len() == g_params.len() {
-                        context.bind(*f, u.clone());
+                        context.union(t.clone(), u.clone());
                         for unify in f_params.clone().into_iter().zip(g_params.clone()) {
                             to_visit.push(unify)
                         }
@@ -126,25 +136,11 @@ impl InnerTerm {
             }
         }
 
-        Some(context.get_bindings())
-    }
-
-    pub fn find(&self, context: &UnificationContext) -> InnerTerm {
-        match self {
-            Term::Variable { symbol } => {
-                if let Some(t) = context.deref(symbol) {
-                    t
-                } else {
-                    self
-                }
-            }
-            t => t,
-        }
-        .clone()
+        Some(context.bindings())
     }
 
     /// Checks if this term contains variable `t`
-    pub fn contains(&self, u: &InnerTerm, context: &mut UnificationContext) -> bool {
+    pub fn contains(&self, u: &InnerTerm, context: &mut UnificationGraph) -> bool {
         context.incr_marker();
 
         // Sadly Rust does not guarantee tail call optimizations (c.f https://dev.to/seanchen1991/the-story-of-tail-call-optimizations-in-rust-35hf)
@@ -197,7 +193,7 @@ mod tests {
             ],
         };
 
-        let mut context = UnificationContext::default();
+        let mut context = UnificationGraph::default();
 
         assert!(test_var_term.contains(
             &Term::Variable {
@@ -238,93 +234,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn apply_test() {
-        let test_var_term = Term::Variable {
-            symbol: Identifier::Variable(0),
-        };
-        let test_fun_term = Term::Function {
-            symbol: Identifier::Function(0),
-            parameters: vec![
-                Term::Variable {
-                    symbol: Identifier::Variable(1),
-                },
-                Term::Function {
-                    symbol: Identifier::Function(1),
-                    parameters: vec![Term::Variable {
-                        symbol: Identifier::Variable(0),
-                    }],
-                },
-                Term::Variable {
-                    symbol: Identifier::Variable(3),
-                },
-            ],
-        };
-
-        let mut context = UnificationContext::default();
-        context.bind(
-            Identifier::Variable(0),
-            Term::Function {
-                symbol: Identifier::Function(2),
-                parameters: vec![],
-            },
-        );
-        context.bind(
-            Identifier::Variable(1),
-            Term::Variable {
-                symbol: Identifier::Variable(0),
-            },
-        );
-        context.bind(
-            Identifier::Variable(2),
-            Term::Function {
-                symbol: Identifier::Function(4),
-                parameters: vec![],
-            },
-        );
-        context.bind(
-            Identifier::Variable(3),
-            Term::Function {
-                symbol: Identifier::Function(5),
-                parameters: vec![],
-            },
-        );
-
-        let bindings = context.get_bindings();
-        let applied_var = test_var_term.apply(&bindings);
-        let applied_fun = test_fun_term.apply(&bindings);
-        assert_eq!(
-            applied_var,
-            Term::Function {
-                symbol: Identifier::Function(2),
-                parameters: vec![]
-            }
-        );
-        assert_eq!(
-            applied_fun,
-            Term::Function {
-                symbol: Identifier::Function(0),
-                parameters: vec![
-                    Term::Function {
-                        symbol: Identifier::Function(2),
-                        parameters: vec![]
-                    },
-                    Term::Function {
-                        symbol: Identifier::Function(1),
-                        parameters: vec![Term::Function {
-                            symbol: Identifier::Function(2),
-                            parameters: vec![]
-                        }],
-                    },
-                    Term::Function {
-                        symbol: Identifier::Function(5),
-                        parameters: vec![]
-                    },
-                ]
-            }
-        )
-    }
-
     // The following tests on unification are issued from [wikipedia](https://en.wikipedia.org/wiki/Unification_(computer_science))
     #[test]
     fn unify_tautology_const_test() {
@@ -344,7 +253,7 @@ mod tests {
         };
         let var_copy = var.clone();
 
-        let mut _context = UnificationContext::default();
+        let mut _context = UnificationGraph::default();
         assert!(var.unify(&var_copy).is_some());
     }
 

@@ -71,7 +71,7 @@ impl Sniffer {
         };
 
         // We keep saturating our rule set until we either find our atom or the set is fully saturated
-        self.saturate(select);
+        self.saturate(&inner_rule, select);
 
         if self.rules.contains(&inner_rule) {
             Ok(self
@@ -107,7 +107,7 @@ impl Sniffer {
     ///
     /// return None if it is finis hed because it means that we doesn't have find our solution
     /// return Some(DerivationTree ??) if it is finished because we have find our solution
-    fn saturate(&mut self, select: impl Fn(&InnerRule) -> Selection<Identifier>) -> Option<DerivationTree> {
+    fn saturate(&mut self, searching: &InnerRule, select: impl Fn(&InnerRule) -> Selection<Identifier>) -> Option<DerivationTree> {
         let mut rules_set: Vec<_> = self.rules.clone().into_iter().collect();
 
         while let Some(rule) = rules_set.pop() {
@@ -121,7 +121,11 @@ impl Sniffer {
                     }
                 }
             }
-            self.rules.insert(rule);
+
+            self.rules.insert(rule.clone());
+            if &rule == searching {
+                return None
+            }
         }
 
         None

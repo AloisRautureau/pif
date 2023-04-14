@@ -1,8 +1,19 @@
-use crate::ast::{InnerAtom, InnerRule, Rule};
+use crate::ast::{Atom, InnerRule, Rule};
+use crate::identifiers::{Identifier, IdentifierServer};
 
-pub enum Selection {
-    Premise(InnerAtom),
-    Conclusion(InnerAtom),
+#[derive(Clone)]
+pub enum Selection<T> {
+    Premise(Atom<T>),
+    Conclusion(Atom<T>),
+}
+impl TryFrom<(&Selection<Identifier>, &IdentifierServer)> for Selection<String> {
+    type Error = ();
+    fn try_from((s, id_server): (&Selection<Identifier>, &IdentifierServer)) -> Result<Self, Self::Error> {
+        Ok(match s {
+            Selection::Premise(a) => Selection::Premise(Atom::try_from((a, id_server))?),
+            Selection::Conclusion(a) => Selection::Conclusion(Atom::try_from((a, id_server))?),
+        })
+    }
 }
 
 impl InnerRule {
@@ -15,7 +26,7 @@ impl InnerRule {
     pub fn resolve(
         &self,
         other: &InnerRule,
-        select: impl Fn(&InnerRule) -> Selection,
+        select: impl Fn(&InnerRule) -> Selection<Identifier>,
     ) -> Option<InnerRule> {
         match (select(self), select(other)) {
             (Selection::Premise(p), Selection::Conclusion(c))

@@ -32,8 +32,8 @@ att(pub(skb)).
 
 # Agent a, s'adressant à un X quelconque.
 
-att(aenc(pair(pub(ska),na),pub(X))).
-att(aenc(pair(na,Y),pub(ska))) => att(aenc(Y,pub(X))).
+att(X) => att(aenc(pair(pub(ska),na),pub(X))).
+att(X) /\ att(aenc(pair(na,Y),pub(ska))) => att(aenc(Y,pub(X))).
 
 # Agent b, échangeant avec a seulement.
 

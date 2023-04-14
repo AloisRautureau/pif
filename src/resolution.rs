@@ -50,22 +50,6 @@ impl InnerRule {
                     .collect();
                 rule
             }),
-            /*
-            (Selection::Premise(p), Selection::Conclusion(c))
-             => p.unify(&c).map(|bindings| {
-                Rule {
-                    conclusion: self.conclusion.clone(),
-                    premises: self
-                        .premises
-                        .iter()
-                        .chain(&other.premises)
-                        .cloned()
-                        .filter(|a| *a != p)
-                        .collect::<Vec<_>>(),
-                }
-                .apply(&bindings)
-            }),
-            */
             (Selection::Conclusion(_), Selection::Premise(_, _)) => {
                 other.resolve(self, select, keep)
             }

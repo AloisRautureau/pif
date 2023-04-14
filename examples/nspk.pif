@@ -13,7 +13,6 @@ att(X) => att(pub(X)).
 # m avec la clé publique pk.
 
 # Protocole Needham-Schroeder à clé publique
-# Alice <-> Bob
 #
 # a -> b : {pub(ska),na}_pub(skb)
 # a <- b : {na,nb}_pub(ska)

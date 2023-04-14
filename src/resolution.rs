@@ -23,7 +23,9 @@ impl InnerRule {
     /// r1 = |p| /\ q => r  (selected p)
     /// r2 = s /\ t => |c|  (selected c)
     /// if unfify(p, c) {
-    ///     return asssigned(q /\ s /\ t => r, unify_context)
+    ///     (q /\ s /\ t => r).asssigned(unify_context)
+    ///     - delete every Att(X) from q /\ s /\ t where X is not in r
+    ///     return (q /\ s /\ t => r)
     /// }
     pub fn resolve(
         &self,
@@ -46,22 +48,6 @@ impl InnerRule {
                     .retain(|p| keep(p, &rule.conclusion));
                 rule
             }),
-            /*
-            (Selection::Premise(p), Selection::Conclusion(c))
-             => p.unify(&c).map(|bindings| {
-                Rule {
-                    conclusion: self.conclusion.clone(),
-                    premises: self
-                        .premises
-                        .iter()
-                        .chain(&other.premises)
-                        .cloned()
-                        .filter(|a| *a != p)
-                        .collect::<Vec<_>>(),
-                }
-                .apply(&bindings)
-            }),
-            */
             (Selection::Conclusion(_), Selection::Premise(_, _)) => {
                 other.resolve(self, select, keep)
             }

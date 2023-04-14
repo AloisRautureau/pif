@@ -30,10 +30,7 @@ impl<T: Hash + Eq + PartialEq + Clone> UnionFind<T> {
     }
 
     pub fn union(&mut self, x: T, y: T) {
-        let (x_root, y_root) = (
-            self.find_equivalence_mut(x),
-            self.find_equivalence_mut(y),
-        );
+        let (x_root, y_root) = (self.find_equivalence_mut(x), self.find_equivalence_mut(y));
 
         if x_root != y_root {
             let x_rank = self.nodes.get(&x_root).unwrap().rank;
@@ -53,7 +50,7 @@ impl<T: Hash + Eq + PartialEq + Clone> UnionFind<T> {
         // We insert the value if it does not already exist
         if !self.nodes.contains_key(&value) {
             self.insert(value.clone());
-            return value.clone()
+            return value.clone();
         }
 
         let mut path = vec![value.clone()];
@@ -76,16 +73,16 @@ impl<T: Hash + Eq + PartialEq + Clone> UnionFind<T> {
 
     pub fn find_equivalence(&self, mut value: T) -> Option<T> {
         if !self.nodes.contains_key(&value) {
-            return None
+            return None;
         }
 
         while let Some(NodeInfo {
-                           parent: Some(parent),
-                           ..
-                       }) = self.nodes.get(&value)
+            parent: Some(parent),
+            ..
+        }) = self.nodes.get(&value)
         {
             if parent == &value {
-                break
+                break;
             }
             value = parent.clone();
         }

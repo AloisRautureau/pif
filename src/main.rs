@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use logos_nom_bridge::Tokens;
+use ptree::{Color, Style};
 use sniffer::{Parser, Sniffer};
 use std::env;
-use ptree::{Color, Style};
 
 fn main() {
     let args = env::args().collect::<Vec<_>>();
@@ -25,7 +25,7 @@ fn main() {
         foreground: Some(Color::Yellow),
         background: None,
         bold: true,
-        .. Default::default()
+        ..Default::default()
     };
     while let Ok(line) = rl.readline(&prompt_style.paint("sniffer >> ").to_string()) {
         let _ = rl.add_history_entry(line.clone());

@@ -1,7 +1,7 @@
 use crate::ast::{InnerAtom, InnerTerm, Term};
 use crate::identifiers::Identifier;
-use std::collections::HashMap;
 use crate::union_find::UnionFind;
+use std::collections::HashMap;
 
 struct VarInfo {
     pub marker: usize,
@@ -65,7 +65,11 @@ impl UnificationGraph {
     pub fn deref(&self, term: InnerTerm) -> Option<InnerTerm> {
         let root = self.equivalence_classes.find_equivalence(term.clone())?;
         if let Some(VarInfo { bound: Some(t), .. }) = self.nodes.get(root.symbol()) {
-            Some(self.equivalence_classes.find_equivalence(t.clone()).unwrap_or(t.clone()))
+            Some(
+                self.equivalence_classes
+                    .find_equivalence(t.clone())
+                    .unwrap_or(t.clone()),
+            )
         } else {
             Some(root)
         }

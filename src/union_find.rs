@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::hash::Hash;
+use rustc_hash::FxHashMap;
 
 struct NodeInfo<T: Hash + Eq + PartialEq + Clone> {
     pub parent: Option<T>,
@@ -15,7 +15,7 @@ impl<T: Hash + Eq + PartialEq + Clone> Default for NodeInfo<T> {
 }
 
 pub struct UnionFind<T: Hash + Eq + PartialEq + Clone> {
-    nodes: HashMap<T, NodeInfo<T>>,
+    nodes: FxHashMap<T, NodeInfo<T>>,
 }
 impl<T: Hash + Eq + PartialEq + Clone> Default for UnionFind<T> {
     fn default() -> Self {

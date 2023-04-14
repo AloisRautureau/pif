@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use crate::ast::{InnerAtom, InnerTerm, Term};
 use crate::identifiers::Identifier;
 use crate::union_find::UnionFind;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 struct VarInfo {
     pub marker: usize,
@@ -11,7 +12,7 @@ struct VarInfo {
 #[derive(Default)]
 pub struct UnificationGraph {
     marker: usize,
-    nodes: HashMap<Identifier, VarInfo>,
+    nodes: FxHashMap<Identifier, VarInfo>,
     equivalence_classes: UnionFind<InnerTerm>,
 }
 impl UnificationGraph {
@@ -75,8 +76,8 @@ impl UnificationGraph {
         }
     }
 
-    pub fn bindings(self) -> HashMap<InnerTerm, InnerTerm> {
-        let mut bindings = HashMap::new();
+    pub fn bindings(self) -> FxHashMap<InnerTerm, InnerTerm> {
+        let mut bindings = HashMap::default();
         for t in self.equivalence_classes.iter() {
             bindings.insert(t.clone(), self.deref(t.clone()).unwrap_or(t.clone()));
         }
@@ -85,14 +86,14 @@ impl UnificationGraph {
 }
 
 impl InnerAtom {
-    pub fn unify(&self, other: &InnerAtom) -> Option<HashMap<InnerTerm, InnerTerm>> {
+    pub fn unify(&self, other: &InnerAtom) -> Option<FxHashMap<InnerTerm, InnerTerm>> {
         Term::from(self.clone()).unify(&Term::from(other.clone()))
     }
 }
 
 impl InnerTerm {
     /// Tries to unify this term with another
-    pub fn unify(&self, other: &InnerTerm) -> Option<HashMap<InnerTerm, InnerTerm>> {
+    pub fn unify(&self, other: &InnerTerm) -> Option<FxHashMap<InnerTerm, InnerTerm>> {
         let mut context = UnificationGraph::default();
         let mut to_visit = vec![(self.clone(), other.clone())];
 

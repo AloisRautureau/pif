@@ -31,6 +31,16 @@ impl<T: Clone + Hash + Eq + PartialEq> Term<T> {
     pub fn is_variable(&self) -> bool {
         matches!(self, Term::Variable { .. })
     }
+
+    pub fn contains_variable(&self, variable: &Term<T>) -> bool {
+        let Term::Variable {symbol} = variable else { panic!("Expected variable")};
+        match self {
+            Term::Function { parameters, .. } => {
+                parameters.iter().any(|t| t.contains_variable(variable))
+            }
+            Term::Variable { symbol: v } => v == symbol,
+        }
+    }
 }
 /// Allows transformation of Atoms to Terms seamlessly
 impl<T> From<Atom<T>> for Term<T> {
@@ -79,6 +89,22 @@ impl<T: Clone + Hash + Eq + PartialEq> Atom<T> {
                 .map(|t| t.apply(bindings))
                 .collect(),
         }
+    }
+
+    pub fn contains_variable(&self, variable: &Term<T>) -> bool {
+        self.parameters
+            .iter()
+            .any(|t| t.contains_variable(variable))
+    }
+
+    // Checks if the given atom is like Symbol(...)
+    pub fn is_symbol(&self, symbol: T) -> bool {
+        self.symbol == symbol
+    }
+
+    /// Checks if the given atom is like Symbol(X) where X is a variable
+    pub fn is_smth_of_variable(&self) -> bool {
+        self.parameters.len() == 1 && self.parameters[0].is_variable()
     }
 }
 impl<T> TryFrom<Term<T>> for Atom<T> {

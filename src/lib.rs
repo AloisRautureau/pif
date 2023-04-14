@@ -25,8 +25,14 @@ mod union_find;
 /// new rule can be added
 #[derive(Default)]
 pub struct Sniffer {
-    rules: HashSet<InnerRule>,
-    derived_from: HashMap<InnerRule, ((InnerRule, InnerRule), (Selection<Identifier>, Selection<Identifier>))>,
+    pub rules: HashSet<InnerRule>,
+    derived_from: HashMap<
+        InnerRule,
+        (
+            (InnerRule, InnerRule),
+            (Selection<Identifier>, Selection<Identifier>),
+        ),
+    >,
 
     id_server: IdentifierServer,
 }
@@ -62,16 +68,24 @@ impl Sniffer {
 
         // Create a selection function using the query
         let select = move |r: &InnerRule| {
-            for p in r.premises.iter() {
-                if p.symbol == inner_atom.symbol && p.parameters.iter().all(|p| !p.is_variable()) {
-                    return Selection::Premise(p.clone());
+            for (i, p) in r.premises.iter().enumerate() {
+                if p.is_symbol(inner_atom.symbol) && !p.is_smth_of_variable() {
+                    return Selection::Premise(p.clone(), i);
                 }
             }
             Selection::Conclusion(r.conclusion.clone())
         };
 
+        let keep = move |a: &Atom<Identifier>, c: &Atom<Identifier>| {
+            if a.is_symbol(inner_atom.symbol) && a.is_smth_of_variable() {
+                c.contains_variable(&a.parameters[0])
+            } else {
+                true
+            }
+        };
+
         // We keep saturating our rule set until we either find our atom or the set is fully saturated
-        self.saturate(select);
+        self.saturate(select, keep);
 
         if self.rules.contains(&inner_rule) {
             Ok(self
@@ -107,16 +121,21 @@ impl Sniffer {
     ///
     /// return None if it is finis hed because it means that we doesn't have find our solution
     /// return Some(DerivationTree ??) if it is finished because we have find our solution
-    fn saturate(&mut self, select: impl Fn(&InnerRule) -> Selection<Identifier>) -> Option<DerivationTree> {
+    fn saturate(
+        &mut self,
+        select: impl Fn(&InnerRule) -> Selection<Identifier>,
+        keep: impl Fn(&Atom<Identifier>, &Atom<Identifier>) -> bool,
+    ) -> Option<DerivationTree> {
         let mut rules_set: Vec<_> = self.rules.clone().into_iter().collect();
 
         while let Some(rule) = rules_set.pop() {
             for other in &self.rules {
-                if let Some(r) = rule.resolve(other, &select) {
+                if let Some(r) = rule.resolve(other, &select, &keep) {
                     if !self.rules.contains(&r) {
                         let selected = (select(&rule), select(&other));
                         self.derived_from
                             .insert(r.clone(), ((rule.clone(), other.clone()), selected));
+
                         rules_set.push(r)
                     }
                 }
@@ -134,11 +153,15 @@ impl Sniffer {
                 DerivationTree::new(Rule::try_from((root, &sniffer.id_server)).ok()?);
             if let Some((premises, selections)) = sniffer.derived_from.get(root) {
                 if let Some(mut tree) = inner(&premises.0, sniffer) {
-                    tree.set_selection(Selection::try_from((&selections.0, &sniffer.id_server)).unwrap());
+                    tree.set_selection(
+                        Selection::try_from((&selections.0, &sniffer.id_server)).unwrap(),
+                    );
                     derivation_tree.add_subtree(tree)
                 }
                 if let Some(mut tree) = inner(&premises.1, sniffer) {
-                    tree.set_selection(Selection::try_from((&selections.1, &sniffer.id_server)).unwrap());
+                    tree.set_selection(
+                        Selection::try_from((&selections.1, &sniffer.id_server)).unwrap(),
+                    );
                     derivation_tree.add_subtree(tree)
                 }
             };
@@ -170,6 +193,12 @@ impl Sniffer {
                     .map(|v| v.to_string())
             })
             .join("\n")
+    }
+
+    pub fn iter_rules(&self) -> impl Iterator<Item = Rule<String>> + '_ {
+        self.rules
+            .iter()
+            .filter_map(move |r| Rule::try_from((r, &self.id_server)).ok())
     }
 }
 

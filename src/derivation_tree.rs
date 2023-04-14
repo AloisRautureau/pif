@@ -1,8 +1,8 @@
 use crate::ast::Rule;
+use crate::resolution::Selection;
 use ptree::{Color, Style, TreeItem};
 use std::borrow::Cow;
 use std::io::Write;
-use crate::resolution::Selection;
 
 #[derive(Clone)]
 pub struct DerivationTree {
@@ -33,14 +33,20 @@ impl TreeItem for DerivationTree {
         selected_style.bold = true;
 
         let str_select = self.selection.as_ref().map(|selection| {
-            let (Selection::Conclusion(a) | Selection::Premise(a)) = selection;
+            let (Selection::Conclusion(a) | Selection::Premise(a, _)) = selection;
             a.to_string()
         });
 
         let string = self.root.to_string();
         if let Some(selected_str) = str_select {
             let mut non_selected = string.split(&selected_str);
-            write!(f, "{}{}{}", style.paint(non_selected.next().unwrap_or(&String::new())), selected_style.paint(&selected_str), style.paint(non_selected.next().unwrap_or(&String::new())))
+            write!(
+                f,
+                "{}{}{}",
+                style.paint(non_selected.next().unwrap_or(&String::new())),
+                selected_style.paint(&selected_str),
+                style.paint(non_selected.next().unwrap_or(&String::new()))
+            )
         } else {
             write!(f, "{}", style.paint(string))
         }

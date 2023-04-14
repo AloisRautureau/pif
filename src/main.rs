@@ -94,19 +94,29 @@ fn handle_command(command: &str, query: &str, sniffer: &mut Sniffer) -> CommandR
             CommandResult::OkCommand
         }
         "derivation" => {
-            let rules = if let Ok(rules) = Parser::parse_rules(Tokens::new(query)) {
-                rules
+            if query.is_empty() {
+                for tree in sniffer
+                    .iter_rules()
+                    .filter_map(|r| sniffer.derivation_tree(&r))
+                {
+                    ptree::print_tree(&tree).unwrap()
+                }
+                CommandResult::OkCommand
             } else {
-                return CommandResult::ParsingError;
-            };
+                let rules = if let Ok(rules) = Parser::parse_rules(Tokens::new(query)) {
+                    rules
+                } else {
+                    return CommandResult::ParsingError;
+                };
 
-            for tree in rules
-                .into_iter()
-                .filter_map(|r| sniffer.derivation_tree(&r))
-            {
-                ptree::print_tree(&tree).unwrap()
+                for tree in rules
+                    .into_iter()
+                    .filter_map(|r| sniffer.derivation_tree(&r))
+                {
+                    ptree::print_tree(&tree).unwrap()
+                }
+                CommandResult::OkCommand
             }
-            CommandResult::OkCommand
         }
 
         "quit" => CommandResult::Quit,

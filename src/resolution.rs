@@ -3,14 +3,16 @@ use crate::identifiers::{Identifier, IdentifierServer};
 
 #[derive(Clone)]
 pub enum Selection<T> {
-    Premise(Atom<T>),
+    Premise(Atom<T>, usize),
     Conclusion(Atom<T>),
 }
 impl TryFrom<(&Selection<Identifier>, &IdentifierServer)> for Selection<String> {
     type Error = ();
-    fn try_from((s, id_server): (&Selection<Identifier>, &IdentifierServer)) -> Result<Self, Self::Error> {
+    fn try_from(
+        (s, id_server): (&Selection<Identifier>, &IdentifierServer),
+    ) -> Result<Self, Self::Error> {
         Ok(match s {
-            Selection::Premise(a) => Selection::Premise(Atom::try_from((a, id_server))?),
+            Selection::Premise(a, i) => Selection::Premise(Atom::try_from((a, id_server))?, *i),
             Selection::Conclusion(a) => Selection::Conclusion(Atom::try_from((a, id_server))?),
         })
     }
@@ -27,26 +29,45 @@ impl InnerRule {
         &self,
         other: &InnerRule,
         select: impl Fn(&InnerRule) -> Selection<Identifier>,
+        keep: impl Fn(&Atom<Identifier>, &Atom<Identifier>) -> bool,
     ) -> Option<InnerRule> {
         match (select(self), select(other)) {
+            (Selection::Premise(p, i), Selection::Conclusion(c)) => p.unify(&c).map(|bindings| {
+                let mut premises = self.premises.clone();
+                premises.remove(i);
+                premises.append(&mut other.premises.clone());
+                let mut rule = Rule {
+                    conclusion: self.conclusion.clone(),
+                    premises: premises,
+                };
+                rule = rule.apply(&bindings);
+                rule.premises = rule
+                    .premises
+                    .into_iter()
+                    .filter(|p| keep(p, &rule.conclusion))
+                    .collect();
+                rule
+            }),
+            /*
             (Selection::Premise(p), Selection::Conclusion(c))
-            | (Selection::Conclusion(c), Selection::Premise(p)) => p.unify(&c).map(|bindings| {
+             => p.unify(&c).map(|bindings| {
                 Rule {
-                    conclusion: if self.conclusion == c {
-                        other.conclusion.clone()
-                    } else {
-                        self.conclusion.clone()
-                    },
+                    conclusion: self.conclusion.clone(),
                     premises: self
                         .premises
                         .iter()
                         .chain(&other.premises)
                         .cloned()
-                        .filter(|a| *a != p && *a != c)
+                        .filter(|a| *a != p)
                         .collect::<Vec<_>>(),
                 }
                 .apply(&bindings)
             }),
+            */
+            (Selection::Conclusion(_), Selection::Premise(_, _)) => {
+                other.resolve(self, select, keep)
+            }
+
             _ => None,
         }
     }

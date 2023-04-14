@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::ast::*;
 use crate::derivation_tree::DerivationTree;
 use crate::identifiers::{Identifier, IdentifierServer};
@@ -49,7 +50,7 @@ impl Sniffer {
         // Then maps every string id to an inner identifier
         let mut sniffer = Sniffer::default();
         for rule in parsed_rules {
-            let inner_rule = Rule::from((&rule, &mut sniffer.id_server));
+            let inner_rule = rule.to_inner(&mut sniffer.id_server);
             sniffer.rules.insert(inner_rule);
         }
         Ok(sniffer)
@@ -57,7 +58,7 @@ impl Sniffer {
 
     /// Returns a derivation that results in a given rule if one exists
     pub fn find(&mut self, atom: &Atom<String>) -> Result<DerivationTree, SaturationFailure> {
-        let inner_atom = Atom::from((atom, &mut self.id_server));
+        let inner_atom = atom.to_inner(&mut self.id_server, &mut HashMap::new());
         let inner_rule = Rule {
             conclusion: inner_atom.clone(),
             premises: vec![],
@@ -129,7 +130,7 @@ impl Sniffer {
 
         while let Some(rule) = rules_set.pop() {
             for other in &self.rules {
-                if let Some(r) = rule.resolve(other, &select, &keep) {
+                if let Some(r) = rule.resolve(other, &select, &keep).map(|r| r.make_fresh(&mut self.id_server)) {
                     if !(r.premises.len() == 1 && r.premises[0] == r.conclusion) && r != rule {
                         let selected = (select(&rule), select(other));
                         self.derived_from
@@ -150,10 +151,10 @@ impl Sniffer {
     }
 
     /// Returns the derivation tree for a given rule
-    pub fn derivation_tree(&self, root: &Rule<String>) -> Option<DerivationTree> {
+    pub fn derivation_tree(&mut self, root: &Rule<String>) -> Option<DerivationTree> {
         fn inner(root: &InnerRule, sniffer: &Sniffer) -> Option<DerivationTree> {
             let mut derivation_tree =
-                DerivationTree::new(Rule::try_from((root, &sniffer.id_server)).ok()?);
+                DerivationTree::new(root.to_string(&sniffer.id_server));
             if let Some(DerivationInfo { rules, selected_atoms }) = sniffer.derived_from.get(root) {
                 if let Some(mut tree) = inner(&rules.0, sniffer) {
                     tree.set_selection(
@@ -171,7 +172,7 @@ impl Sniffer {
             Some(derivation_tree)
         }
 
-        let inner_rule = Rule::try_from((root, &self.id_server)).ok()?;
+        let inner_rule = root.to_inner(&mut self.id_server);
 
         let mut decision_tree = DerivationTree::new(root.clone());
         if let Some(DerivationInfo { rules, selected_atoms }) = self.derived_from.get(&inner_rule) {
@@ -190,10 +191,8 @@ impl Sniffer {
     pub fn rules_to_string(&self) -> String {
         self.rules
             .iter()
-            .filter_map(|r| {
-                Rule::try_from((r, &self.id_server))
-                    .ok()
-                    .map(|v| v.to_string())
+            .map(|r| {
+                r.to_string(&self.id_server).to_string()
             })
             .join("\n")
     }
@@ -201,7 +200,7 @@ impl Sniffer {
     pub fn iter_rules(&self) -> impl Iterator<Item = Rule<String>> + '_ {
         self.rules
             .iter()
-            .filter_map(move |r| Rule::try_from((r, &self.id_server)).ok())
+            .map(|r| r.to_string(&self.id_server))
     }
 }
 

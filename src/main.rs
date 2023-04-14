@@ -84,6 +84,7 @@ fn handle_command(command: &str, query: &str, sniffer: &mut Sniffer) -> CommandR
         }
         "derivation" => {
             if query.is_empty() {
+                todo!();
                 for tree in sniffer
                     .iter_rules()
                     .filter_map(|r| sniffer.derivation_tree(&r))

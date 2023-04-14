@@ -12,8 +12,8 @@ impl TryFrom<(&Selection<Identifier>, &IdentifierServer)> for Selection<String> 
         (s, id_server): (&Selection<Identifier>, &IdentifierServer),
     ) -> Result<Self, Self::Error> {
         Ok(match s {
-            Selection::Premise(a, i) => Selection::Premise(Atom::try_from((a, id_server))?, *i),
-            Selection::Conclusion(a) => Selection::Conclusion(Atom::try_from((a, id_server))?),
+            Selection::Premise(a, i) => Selection::Premise(a.to_string(id_server), *i),
+            Selection::Conclusion(a) => Selection::Conclusion(a.to_string(id_server)),
         })
     }
 }

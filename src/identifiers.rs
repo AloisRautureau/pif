@@ -1,5 +1,6 @@
-use crate::ast::Term;
+use std::collections::HashMap;
 use rustc_hash::FxHashMap;
+use crate::ast::{Atom, InnerAtom, InnerRule, InnerTerm, Rule, Term};
 
 /// Inner representation for identifiers
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Copy, Clone, Debug)]
@@ -16,31 +17,34 @@ pub struct IdentifierServer {
 }
 impl IdentifierServer {
     /// Registers a new term, returning its identifier
-    pub fn register(&mut self, t: &Term<String>) -> Identifier {
-        let symbol = t.symbol();
-        if let Some(id) = self.names_map.get(symbol) {
-            *id
+    pub fn register_function(&mut self, symbol: &str) -> Identifier {
+        if let Some(identifier) = self.names_map.get(symbol) {
+            *identifier
         } else {
-            let id = match t {
-                Term::Variable { .. } => {
-                    self.variables_count += 1;
-                    Identifier::Variable(self.variables_count - 1)
-                }
-                Term::Function { .. } => {
-                    self.functions_count += 1;
-                    Identifier::Function(self.functions_count - 1)
-                }
-            };
-
-            self.ids_map.insert(id, symbol.to_string());
-            self.names_map.insert(symbol.to_string(), id);
-            id
+            let identifier = Identifier::Function(self.functions_count);
+            self.functions_count += 1;
+            self.ids_map.insert(identifier, symbol.to_string());
+            self.names_map.insert(symbol.to_string(), identifier);
+            identifier
         }
     }
 
+    pub fn register_variable(&mut self) -> Identifier {
+        let id = self.variables_count;
+        let identifier = Identifier::Variable(id);
+        let symbol = String::from("VAR") + &id.to_string();
+        self.ids_map.insert(identifier, symbol.clone());
+        self.names_map.insert(symbol.clone(), identifier);
+        self.variables_count += 1;
+        identifier
+    }
+
     /// Returns the name associated with the given identifier
-    pub fn name_of(&self, id: &Identifier) -> Option<&String> {
-        self.ids_map.get(id)
+    pub fn name_of(&self, id: &Identifier) -> Option<String> {
+        match id {
+            Identifier::Function(i) => self.ids_map.get(id).cloned(),
+            Identifier::Variable(i) => Some(String::from("VAR") + &i.to_string())
+        }
     }
 
     pub fn id_of(&self, name: &str) -> Option<&Identifier> {
@@ -48,196 +52,135 @@ impl IdentifierServer {
     }
 }
 
-/*
-CONVERSION TRAITS
- */
-mod conversion {
-    use crate::ast::{Atom, InnerAtom, InnerRule, InnerTerm, Rule, Term};
-    use crate::identifiers::IdentifierServer;
+impl Term<String> {
+    pub fn to_inner(&self, id_server: &mut IdentifierServer, bindings: &mut HashMap<String, Identifier>) -> InnerTerm {
+        match self {
+            Term::Variable { symbol } => {
+                let identifier = if let Some(identifier) = bindings.get(symbol) {
+                    *identifier
+                } else {
+                    let identifier = id_server.register_variable();
+                    bindings.insert(symbol.clone(), identifier);
+                    identifier
+                };
+                Term::Variable { symbol: identifier }
 
-    // TERM
-    impl From<(&Term<String>, &mut IdentifierServer)> for InnerTerm {
-        fn from((t, id_server): (&Term<String>, &mut IdentifierServer)) -> Self {
-            match t {
-                Term::Variable { .. } => Term::Variable {
-                    symbol: id_server.register(t),
-                },
-                Term::Function { parameters, .. } => {
-                    let symbol = id_server.register(t);
-                    let mut new_parameters = vec![];
-                    for parameter in parameters {
-                        new_parameters.push(Term::from((parameter, &mut *id_server)))
-                    }
-                    Term::Function {
-                        symbol,
-                        parameters: new_parameters,
-                    }
-                }
+            }
+            Term::Function { symbol, parameters } => Term::Function {
+                symbol: id_server.register_function(symbol),
+                parameters: parameters
+                    .iter()
+                    .cloned()
+                    .map(|t| t.to_inner(id_server, bindings))
+                    .collect(),
+            }
+        }
+    }
+}
+impl InnerTerm {
+    pub fn to_string(&self, id_server: &IdentifierServer) -> Term<String> {
+        match self {
+            Term::Variable { symbol } => Term::Variable { symbol: id_server.name_of(symbol).unwrap() },
+            Term::Function { symbol, parameters } => Term::Function {
+                symbol: id_server.name_of(symbol).unwrap(),
+                parameters: parameters
+                    .iter()
+                    .cloned()
+                    .map(|t| t.to_string(id_server))
+                    .collect(),
             }
         }
     }
 
-    impl TryFrom<(&Term<String>, &IdentifierServer)> for InnerTerm {
-        type Error = ();
+    pub fn make_fresh(&self, id_server: &mut IdentifierServer, bindings: &mut HashMap<Identifier, Identifier>) -> InnerTerm {
+        match self {
+            Term::Variable { symbol } => {
+                let identifier = if let Some(identifier) = bindings.get(symbol) {
+                    *identifier
+                } else {
+                    let identifier = id_server.register_variable();
+                    bindings.insert(symbol.clone(), identifier);
+                    identifier
+                };
+                Term::Variable { symbol: identifier }
 
-        fn try_from(
-            (t, id_server): (&Term<String>, &IdentifierServer),
-        ) -> Result<Self, Self::Error> {
-            Ok(match t {
-                Term::Variable { symbol } => Term::Variable {
-                    symbol: *id_server.id_of(symbol).ok_or(())?,
-                },
-                Term::Function { symbol, parameters } => {
-                    let symbol = *id_server.id_of(symbol).ok_or(())?;
-                    let mut new_parameters = vec![];
-                    for parameter in parameters {
-                        new_parameters.push(Term::try_from((parameter, id_server))?)
-                    }
-                    Term::Function {
-                        symbol,
-                        parameters: new_parameters,
-                    }
-                }
-            })
-        }
-    }
-
-    impl TryFrom<(&InnerTerm, &IdentifierServer)> for Term<String> {
-        type Error = ();
-
-        fn try_from((t, id_server): (&InnerTerm, &IdentifierServer)) -> Result<Self, Self::Error> {
-            Ok(match t {
-                Term::Variable { symbol } => Term::Variable {
-                    symbol: id_server.name_of(symbol).ok_or(())?.clone(),
-                },
-                Term::Function { symbol, parameters } => {
-                    let symbol = id_server.name_of(symbol).ok_or(())?.clone();
-                    let mut new_parameters = vec![];
-                    for parameter in parameters {
-                        new_parameters.push(Term::try_from((parameter, id_server))?)
-                    }
-                    Term::Function {
-                        symbol,
-                        parameters: new_parameters,
-                    }
-                }
-            })
-        }
-    }
-
-    // ATOM
-    impl From<(&Atom<String>, &mut IdentifierServer)> for InnerAtom {
-        fn from((a, id_server): (&Atom<String>, &mut IdentifierServer)) -> Self {
-            let Atom {
-                symbol: _,
-                parameters,
-            } = a;
-            let symbol = id_server.register(&Term::from(a.clone()));
-            let mut new_parameters = vec![];
-            for parameter in parameters {
-                new_parameters.push(Term::from((parameter, &mut *id_server)))
             }
+            Term::Function { symbol, parameters } => Term::Function {
+                symbol: *symbol,
+                parameters: parameters
+                    .iter()
+                    .cloned()
+                    .map(|t| t.make_fresh(id_server, bindings))
+                    .collect(),
+            }
+        }
+    }
+}
+
+impl Atom<String> {
+    pub fn to_inner(&self, id_server: &mut IdentifierServer, bindings: &mut HashMap<String, Identifier>) -> InnerAtom {
+        Atom {
+            symbol: id_server.register_function(&self.symbol),
+            parameters: self.parameters
+                .iter()
+                .map(|t| t.to_inner(id_server, bindings))
+                .collect()
+        }
+    }
+}
+impl InnerAtom {
+    pub fn to_string(&self, id_server: &IdentifierServer) -> Atom<String> {
             Atom {
-                symbol,
-                parameters: new_parameters,
+                symbol: id_server.name_of(&self.symbol).unwrap().clone(),
+                parameters: self.parameters
+                    .iter()
+                    .map(|t| t.to_string(id_server))
+                    .collect()
             }
+    }
+
+    pub fn make_fresh(&self, id_server: &mut IdentifierServer, bindings: &mut HashMap<Identifier, Identifier>) -> InnerAtom {
+        Atom {
+            symbol: self.symbol,
+            parameters: self.parameters
+                .iter()
+                .map(|t| t.make_fresh(id_server, bindings))
+                .collect()
+        }
+    }
+}
+
+impl Rule<String> {
+    pub fn to_inner(&self, id_server: &mut IdentifierServer) -> InnerRule {
+        let mut bindings = HashMap::new();
+        Rule {
+            conclusion: self.conclusion.to_inner(id_server, &mut bindings),
+            premises: self.premises
+                .iter()
+                .map(|a| a.to_inner(id_server, &mut bindings))
+                .collect()
+        }
+    }
+}
+impl InnerRule {
+    pub fn to_string(&self, id_server: &IdentifierServer) -> Rule<String> {
+        Rule {
+            conclusion: self.conclusion.to_string(id_server),
+            premises: self.premises
+                .iter()
+                .map(|a| a.to_string(id_server))
+                .collect()
         }
     }
 
-    impl TryFrom<(&Atom<String>, &IdentifierServer)> for InnerAtom {
-        type Error = ();
-
-        fn try_from(
-            (a, id_server): (&Atom<String>, &IdentifierServer),
-        ) -> Result<Self, Self::Error> {
-            let Atom { symbol, parameters } = a;
-            let symbol = *id_server.id_of(symbol).ok_or(())?;
-            let mut new_parameters = vec![];
-            for parameter in parameters {
-                new_parameters.push(Term::try_from((parameter, id_server))?)
-            }
-            Ok(Atom {
-                symbol,
-                parameters: new_parameters,
-            })
-        }
-    }
-
-    impl TryFrom<(&InnerAtom, &IdentifierServer)> for Atom<String> {
-        type Error = ();
-
-        fn try_from((a, id_server): (&InnerAtom, &IdentifierServer)) -> Result<Self, Self::Error> {
-            let Atom { symbol, parameters } = a;
-            let symbol = id_server.name_of(symbol).ok_or(())?.clone();
-            let mut new_parameters = vec![];
-            for parameter in parameters {
-                new_parameters.push(Term::try_from((parameter, id_server))?)
-            }
-            Ok(Atom {
-                symbol,
-                parameters: new_parameters,
-            })
-        }
-    }
-
-    // RULE
-    impl From<(&Rule<String>, &mut IdentifierServer)> for InnerRule {
-        fn from((r, id_server): (&Rule<String>, &mut IdentifierServer)) -> Self {
-            let Rule {
-                premises,
-                conclusion,
-            } = r;
-            let conclusion = Atom::from((conclusion, &mut *id_server));
-            let mut new_premises = vec![];
-            for pre in premises {
-                new_premises.push(Atom::from((pre, &mut *id_server)))
-            }
-            Rule {
-                conclusion,
-                premises: new_premises,
-            }
-        }
-    }
-
-    impl TryFrom<(&Rule<String>, &IdentifierServer)> for InnerRule {
-        type Error = ();
-
-        fn try_from(
-            (r, id_server): (&Rule<String>, &IdentifierServer),
-        ) -> Result<Self, Self::Error> {
-            let Rule {
-                premises,
-                conclusion,
-            } = r;
-            let conclusion = Atom::try_from((conclusion, id_server))?;
-            let mut new_premises = vec![];
-            for pre in premises {
-                new_premises.push(Atom::try_from((pre, id_server))?)
-            }
-            Ok(Rule {
-                conclusion,
-                premises: new_premises,
-            })
-        }
-    }
-
-    impl TryFrom<(&InnerRule, &IdentifierServer)> for Rule<String> {
-        type Error = ();
-
-        fn try_from((r, id_server): (&InnerRule, &IdentifierServer)) -> Result<Self, Self::Error> {
-            let Rule {
-                premises,
-                conclusion,
-            } = r;
-            let conclusion = Atom::try_from((conclusion, id_server))?;
-            let mut new_premises = vec![];
-            for pre in premises {
-                new_premises.push(Atom::try_from((pre, id_server))?)
-            }
-            Ok(Rule {
-                conclusion,
-                premises: new_premises,
-            })
+    pub fn make_fresh(&self, id_server: &mut IdentifierServer) -> InnerRule {
+        let mut bindings = HashMap::new();
+        Rule {
+            conclusion: self.conclusion.make_fresh(id_server, &mut bindings),
+            premises: self.premises
+                .iter()
+                .map(|a| a.make_fresh(id_server, &mut bindings))
+                .collect()
         }
     }
 }

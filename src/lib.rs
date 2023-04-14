@@ -19,18 +19,17 @@ mod resolution;
 mod unify;
 mod union_find;
 
+pub struct DerivationInfo {
+    pub rules: (InnerRule, InnerRule),
+    pub selected_atoms: (Selection<Identifier>, Selection<Identifier>),
+}
+
 /// Sniffer's job is to saturate a set of rules, by deriving the current set until no
 /// new rule can be added
 #[derive(Default)]
 pub struct Sniffer {
     pub rules: FxHashSet<InnerRule>,
-    derived_from: FxHashMap<
-        InnerRule,
-        (
-            (InnerRule, InnerRule),
-            (Selection<Identifier>, Selection<Identifier>),
-        ),
-    >,
+    derived_from: FxHashMap<InnerRule, DerivationInfo>,
 
     id_server: IdentifierServer,
 }
@@ -74,6 +73,7 @@ impl Sniffer {
             Selection::Conclusion(r.conclusion.clone())
         };
 
+        // Filter for not useful atoms
         let keep = move |a: &Atom<Identifier>, c: &Atom<Identifier>| {
             if a.is_symbol(inner_atom.symbol) && a.is_smth_of_variable() {
                 c.contains_variable(&a.parameters[0])
@@ -134,7 +134,7 @@ impl Sniffer {
                         let selected = (select(&rule), select(other));
                         self.derived_from
                             .entry(r.clone())
-                            .or_insert_with(|| ((rule.clone(), other.clone()), selected));
+                            .or_insert_with(|| DerivationInfo { rules: (rule.clone(), other.clone()), selected_atoms: selected });
                         rules_set.push(r)
                     }
                 }
@@ -154,16 +154,16 @@ impl Sniffer {
         fn inner(root: &InnerRule, sniffer: &Sniffer) -> Option<DerivationTree> {
             let mut derivation_tree =
                 DerivationTree::new(Rule::try_from((root, &sniffer.id_server)).ok()?);
-            if let Some((premises, selections)) = sniffer.derived_from.get(root) {
-                if let Some(mut tree) = inner(&premises.0, sniffer) {
+            if let Some(DerivationInfo { rules, selected_atoms }) = sniffer.derived_from.get(root) {
+                if let Some(mut tree) = inner(&rules.0, sniffer) {
                     tree.set_selection(
-                        Selection::try_from((&selections.0, &sniffer.id_server)).unwrap(),
+                        Selection::try_from((&selected_atoms.0, &sniffer.id_server)).unwrap(),
                     );
                     derivation_tree.add_subtree(tree)
                 }
-                if let Some(mut tree) = inner(&premises.1, sniffer) {
+                if let Some(mut tree) = inner(&rules.1, sniffer) {
                     tree.set_selection(
-                        Selection::try_from((&selections.1, &sniffer.id_server)).unwrap(),
+                        Selection::try_from((&selected_atoms.1, &sniffer.id_server)).unwrap(),
                     );
                     derivation_tree.add_subtree(tree)
                 }
@@ -174,13 +174,13 @@ impl Sniffer {
         let inner_rule = Rule::try_from((root, &self.id_server)).ok()?;
 
         let mut decision_tree = DerivationTree::new(root.clone());
-        if let Some((premises, selections)) = self.derived_from.get(&inner_rule) {
-            if let Some(mut tree) = inner(&premises.0, self) {
-                tree.set_selection(Selection::try_from((&selections.0, &self.id_server)).unwrap());
+        if let Some(DerivationInfo { rules, selected_atoms }) = self.derived_from.get(&inner_rule) {
+            if let Some(mut tree) = inner(&rules.0, self) {
+                tree.set_selection(Selection::try_from((&selected_atoms.0, &self.id_server)).unwrap());
                 decision_tree.add_subtree(tree)
             }
-            if let Some(mut tree) = inner(&premises.1, self) {
-                tree.set_selection(Selection::try_from((&selections.1, &self.id_server)).unwrap());
+            if let Some(mut tree) = inner(&rules.1, self) {
+                tree.set_selection(Selection::try_from((&selected_atoms.1, &self.id_server)).unwrap());
                 decision_tree.add_subtree(tree)
             }
         };

@@ -7,6 +7,7 @@ use logos_nom_bridge::Tokens;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::rc::Rc;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -130,7 +131,7 @@ impl Sniffer {
         while let Some(rule) = rules_set.pop() {
             for other in &self.rules {
                 if let Some(r) = rule.resolve(other, &select, &keep) {
-                    if r != rule && !self.rules.contains(&r) {
+                    if !(r.premises.len() == 1 && r.premises[0] == r.conclusion) && r != rule && !self.rules.contains(&r) {
                         let selected = (select(&rule), select(other));
                         self.derived_from
                             .entry(r.clone())

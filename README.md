@@ -16,15 +16,10 @@ The executable takes an optional file path argument, which will load up the give
 |  command  | arguments |  action  |
 | -- | -- | -- |
 |  `query`  |  `<axiom>`  | saturates the rule set, showing a valid derivation leading to the queried atom  if one exists |
-|  `define`  |  `<premises> => <conclusion>` or `<axiom>`  | defines a new rule or axiom |
-| `remove` | `<premises> => <conclusion>` or `<axiom>` | removes the given rule or axiom if it exists |
 | `load` | `<file>` | loads a new `.pif` file |
-| `dump` | `<file>` | dumps currently defined rules and axioms a `.pif` file |
 | `quit` | | mystery command |
-| `rules` |  | (DEBUG) lists defined rules |
-| `axioms` |  | (DEBUG) lists defined axioms |
-| `derived-from` |  | (DEBUG) lists what have been derived |
-| `print-sniffer` |  | (DEBUG) lists axioms / rules / derived-from |
+| `rules` |  | lists defined rules |
+| `derivation` | `[query]` | prints the derivation tree of the given rules, or all if no rules are given |
 
 ### `.pif` files
 Those files simply list rules in text form.

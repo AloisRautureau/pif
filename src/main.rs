@@ -62,24 +62,8 @@ fn handle_command(command: &str, query: &str, sniffer: &mut Sniffer) -> CommandR
                 CommandResult::FileError
             }
         }
-        "dump" => CommandResult::OkCommand, //TODO
 
         "query" => {
-            let query = if let Ok(query) = Parser::parse_query(Tokens::new(query)) {
-                query
-            } else {
-                return CommandResult::NotFoundQuery;
-            };
-
-            if let Ok(derivation_tree) = sniffer.find(&query) {
-                ptree::print_tree(&derivation_tree).unwrap();
-                CommandResult::OkCommand
-            } else {
-                CommandResult::NotFoundQuery
-            }
-        }
-        // TODO => debug print (for now the same as query)
-        "query-debug" => {
             let query = if let Ok(query) = Parser::parse_query(Tokens::new(query)) {
                 query
             } else {
@@ -93,8 +77,6 @@ fn handle_command(command: &str, query: &str, sniffer: &mut Sniffer) -> CommandR
                 CommandResult::NotFoundQuery
             }
         }
-        "define" => CommandResult::OkCommand, //TODO
-        "remove" => CommandResult::OkCommand, //TODO
 
         "rules" => {
             println!("{}", sniffer.rules_to_string());

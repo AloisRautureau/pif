@@ -2,6 +2,7 @@ use itertools::Itertools;
 use logos_nom_bridge::Tokens;
 use sniffer::{Parser, Sniffer};
 use std::env;
+use ptree::{Color, Style};
 
 fn main() {
     let args = env::args().collect::<Vec<_>>();
@@ -20,7 +21,13 @@ fn main() {
     };
 
     let mut rl = rustyline::DefaultEditor::new().expect("failed to open repl");
-    while let Ok(line) = rl.readline("sniffer >> ") {
+    let prompt_style = Style {
+        foreground: Some(Color::Yellow),
+        background: None,
+        bold: true,
+        .. Default::default()
+    };
+    while let Ok(line) = rl.readline(&prompt_style.paint("sniffer >> ").to_string()) {
         let _ = rl.add_history_entry(line.clone());
         let mut words = line.split_whitespace();
         let command = words.next().unwrap();

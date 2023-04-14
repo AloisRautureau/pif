@@ -73,7 +73,6 @@ impl UnificationGraph {
 
     pub fn bindings(self) -> HashMap<InnerTerm, InnerTerm> {
         let mut bindings = HashMap::new();
-        println!("{bindings:?}");
         for t in self.equivalence_classes.iter() {
             bindings.insert(t.clone(), self.deref(t.clone()).unwrap_or(t.clone()));
         }
